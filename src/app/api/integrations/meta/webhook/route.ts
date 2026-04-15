@@ -23,7 +23,24 @@ export async function GET(request: NextRequest) {
 export async function POST(request: Request) {
   try {
     const payload = await request.json();
+    const entryCount = Array.isArray((payload as { entry?: unknown[] }).entry)
+      ? (payload as { entry: unknown[] }).entry.length
+      : 0;
+
+    console.info("[meta-webhook] Received payload", {
+      entryCount,
+    });
+
     const result = await ingestMetaWebhook(payload);
+
+    console.info("[meta-webhook] Processed payload", {
+      processed: result.length,
+      createdOrMatchedLeadIds: result
+        .map((entry) => entry.leadId)
+        .filter(Boolean),
+      duplicateCount: result.filter((entry) => entry.duplicate).length,
+      skippedCount: result.filter((entry) => entry.skipped).length,
+    });
 
     revalidatePath("/dashboard");
     result.forEach((entry) => {
@@ -34,6 +51,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, result });
   } catch (error) {
+    console.error("[meta-webhook] Processing failed", error);
+
     return NextResponse.json(
       {
         error:
