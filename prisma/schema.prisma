@@ -1,0 +1,213 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  TELECALLER
+}
+
+enum LeadStatus {
+  NEW
+  ASSIGNED
+  CONTACTED
+  INTERESTED
+  MEETING_SCHEDULED
+  VISITED
+  CONVERTED
+  NOT_INTERESTED
+  LOST
+}
+
+enum LeadPriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum ActivityType {
+  CALL
+  WHATSAPP
+  NOTE
+  STATUS_CHANGE
+  MEETING
+  SYSTEM
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  COMPLETED
+  NO_SHOW
+  CANCELLED
+}
+
+enum AssignmentStrategy {
+  ROUND_ROBIN
+  PRIORITY_POOL
+  MANUAL
+}
+
+enum WebhookSource {
+  META
+  GOOGLE
+}
+
+enum MappingSource {
+  META
+  GOOGLE
+  CSV
+}
+
+model User {
+  id              String           @id @default(cuid())
+  name            String
+  email           String           @unique
+  phone           String?
+  passwordHash    String
+  role            UserRole         @default(TELECALLER)
+  isActive        Boolean          @default(true)
+  isPriorityAgent Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  assignedLeads   Lead[]           @relation("AssignedLeadUser")
+  activities      LeadActivity[]
+  assignments     LeadAssignment[]
+}
+
+model Lead {
+  id                String             @id @default(cuid())
+  metaLeadId        String?            @unique
+  googleLeadId      String?            @unique
+  googleClickId     String?
+  name              String
+  phone             String
+  phoneNormalized   String             @unique
+  email             String?
+  city              String?
+  twelfthLocation   String?
+  jeeRankRange      String?
+  courseInterest    String?
+  counsellorNotes   String?            @db.Text
+  source            String             @default("Meta Ads")
+  campaignName      String?
+  adsetName         String?
+  adName            String?
+  formId            String?
+  pageId            String?
+  status            LeadStatus         @default(NEW)
+  priority          LeadPriority       @default(MEDIUM)
+  nextFollowUpAt    DateTime?
+  lastContactedAt   DateTime?
+  meetingScheduledAt DateTime?
+  assignedToId      String?
+  assignedTo        User?              @relation("AssignedLeadUser", fields: [assignedToId], references: [id], onDelete: SetNull)
+  rawPayload        Json?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  activities        LeadActivity[]
+  assignments       LeadAssignment[]
+  meetings          Meeting[]
+  webhookEvents     WebhookEvent[]
+
+  @@index([status, assignedToId])
+  @@index([priority, createdAt])
+  @@index([nextFollowUpAt])
+}
+
+model LeadActivity {
+  id             String       @id @default(cuid())
+  leadId         String
+  userId         String?
+  type           ActivityType @default(NOTE)
+  title          String?
+  notes          String       @db.Text
+  nextFollowUpAt DateTime?
+  statusAfter    LeadStatus?
+  createdAt      DateTime     @default(now())
+  lead           Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([leadId, createdAt])
+}
+
+model LeadAssignment {
+  id         String             @id @default(cuid())
+  leadId     String
+  userId     String?
+  strategy   AssignmentStrategy @default(ROUND_ROBIN)
+  poolKey    String
+  assignedAt DateTime           @default(now())
+  lead       Lead               @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user       User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, assignedAt])
+}
+
+model Meeting {
+  id          String        @id @default(cuid())
+  leadId      String
+  scheduledAt DateTime
+  status      MeetingStatus @default(SCHEDULED)
+  venue       String        @default("Delhi Office")
+  notes       String?       @db.Text
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  lead        Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([scheduledAt])
+}
+
+model AssignmentCursor {
+  id        String   @id
+  cursor    Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model WebhookEvent {
+  id          String        @id @default(cuid())
+  source      WebhookSource @default(META)
+  externalId  String        @unique
+  payload     Json
+  processedAt DateTime?
+  createdAt   DateTime      @default(now())
+  leadId      String?
+  lead        Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+}
+
+model AutomationSetting {
+  id                 String   @id
+  slaEmailEnabled    Boolean  @default(false)
+  slaWhatsappEnabled Boolean  @default(false)
+  autoAssignEnabled  Boolean  @default(false)
+  lastEvaluatedAt    DateTime?
+  lastEmailSentAt    DateTime?
+  lastWhatsappSentAt DateTime?
+  lastEmailError     String?  @db.Text
+  lastWhatsappError  String?  @db.Text
+  lastSummary        String?  @db.Text
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model CampaignMapping {
+  id            String        @id @default(cuid())
+  source        MappingSource
+  label         String
+  campaignName  String?
+  formId        String?
+  columnMapping Json
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([source, formId])
+  @@unique([source, campaignName])
+  @@index([source, updatedAt])
+}
