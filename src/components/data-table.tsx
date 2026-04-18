@@ -120,12 +120,7 @@ const COLUMN_PREFERENCE_OPTIONS: ColumnPreferenceOption[] = [
   { id: "createdAt", label: "Created", defaultVisible: true },
   { id: "nextFollowUpAt", label: "Follow-up", defaultVisible: true },
   { id: "campaignName", label: "Campaign", defaultVisible: true },
-  {
-    id: "actions",
-    label: "Actions",
-    defaultVisible: true,
-    alwaysVisible: true,
-  },
+  { id: "actions", label: "Actions", defaultVisible: false },
 ];
 
 function getColumnPreferenceOptions(
