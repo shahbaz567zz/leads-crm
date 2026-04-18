@@ -1316,7 +1316,14 @@ export async function updateLead(
 
   const nextFollowUpAt = parseOptionalDate(input.nextFollowUpAt);
   const meetingScheduledAt = parseOptionalDate(input.meetingScheduledAt);
-  const nextStatus = input.status ?? existingLead.status;
+  const assignmentChanged = Boolean(
+    input.assignedToId && input.assignedToId !== existingLead.assignedToId,
+  );
+  const nextStatus =
+    input.status ??
+    (assignmentChanged && existingLead.status === "NEW"
+      ? "ASSIGNED"
+      : existingLead.status);
   const nextPriority = input.priority ?? existingLead.priority;
   const statusChanged = Boolean(
     input.status && input.status !== existingLead.status,

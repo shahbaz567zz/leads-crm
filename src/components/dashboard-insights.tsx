@@ -135,21 +135,21 @@ export function DashboardInsights({
   return (
     <div className="space-y-6">
       <article className="card overflow-hidden">
-        <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 md:flex-row md:items-center md:justify-between dark:border-slate-700">
           <div>
             <h2 className="section-title">Pipeline &amp; Conversion</h2>
-            <p className="mt-0.5 text-sm text-slate-500">
+            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
               Quality metrics and stage distribution
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <a
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
               href={reportExportHref}
             >
               Export CSV
             </a>
-            <span className="rounded-lg bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-700">
+            <span className="rounded-lg bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
               {formatPercent(reporting.conversionRate)} conversion
             </span>
           </div>
@@ -159,10 +159,8 @@ export function DashboardInsights({
           <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
             <div className="space-y-4">
               <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
-                  SLA Queue Filters
-                </p>
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400"></p>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                   Click a chip to jump into the lead queue with that SLA lens.
                 </p>
               </div>
@@ -183,11 +181,11 @@ export function DashboardInsights({
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-xs uppercase tracking-wider text-slate-500">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
+                  <p className="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     Overdue Share
                   </p>
-                  <p className="mt-1 text-xl font-semibold text-slate-900">
+                  <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100">
                     {formatPercent(
                       reporting.slaSummary.overdueOpen > 0
                         ? (reporting.slaSummary.overdueOpen /
@@ -201,14 +199,16 @@ export function DashboardInsights({
                     )}
                   </p>
                 </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-xs uppercase tracking-wider text-slate-500">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
+                  <p className="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     First-Contact Risk
                   </p>
-                  <p className="mt-1 text-xl font-semibold text-slate-900">
+                  <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100">
                     {reporting.slaSummary.staleTwoHours}
                   </p>
-                  <p className="text-xs text-slate-500">leads older than 2h</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    leads older than 2h
+                  </p>
                 </div>
               </div>
             </div>
@@ -216,7 +216,7 @@ export function DashboardInsights({
             <div className="space-y-3">
               {reporting.stageMix.map((item) => (
                 <div key={item.status}>
-                  <div className="mb-1.5 flex items-center justify-between gap-4 text-sm text-slate-600">
+                  <div className="mb-1.5 flex items-center justify-between gap-4 text-sm text-slate-600 dark:text-slate-300">
                     <div className="flex items-center gap-3">
                       <StatusPill mode="status" value={item.status} />
                       <span>
@@ -227,7 +227,7 @@ export function DashboardInsights({
                       {formatPercent(item.share)}
                     </span>
                   </div>
-                  <div className="h-1.5 rounded-full bg-slate-100">
+                  <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-700">
                     <div
                       className="h-1.5 rounded-full bg-indigo-600"
                       style={{
@@ -243,29 +243,29 @@ export function DashboardInsights({
       </article>
 
       <article className="card overflow-hidden">
-        <div className="border-b border-slate-200 px-5 py-4">
+        <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-700">
           <h2 className="section-title">Campaign Snapshot</h2>
-          <p className="mt-0.5 text-sm text-slate-500">
+          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
             Source and campaign yield
           </p>
         </div>
 
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-slate-100 dark:divide-slate-700">
           {reporting.campaignSnapshot.map((campaign) => (
             <div
               key={campaign.label}
               className="flex flex-wrap items-start justify-between gap-3 px-5 py-3"
             >
               <div>
-                <p className="text-sm font-semibold text-slate-900">
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                   {campaign.label}
                 </p>
-                <p className="mt-0.5 text-sm text-slate-500">
+                <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
                   {campaign.total} total &middot; {campaign.converted} converted
                   &middot; {campaign.overdue} overdue
                 </p>
               </div>
-              <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+              <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300">
                 {campaign.highPriority} high-priority
               </span>
             </div>
@@ -281,9 +281,9 @@ export function DashboardInsights({
 
       {managerMode ? (
         <article className="card overflow-hidden">
-          <div className="border-b border-slate-200 px-5 py-4">
+          <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-700">
             <h2 className="section-title">Team Scorecard</h2>
-            <p className="mt-0.5 text-sm text-slate-500">
+            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
               Telecaller workload and delivery
             </p>
           </div>
@@ -302,7 +302,7 @@ export function DashboardInsights({
               <tbody>
                 {reporting.telecallerScorecard.map((telecaller) => (
                   <tr key={telecaller.id}>
-                    <td className="font-medium text-slate-900">
+                    <td className="font-medium text-slate-900 dark:text-slate-100">
                       {telecaller.name}
                     </td>
                     <td>{telecaller.totalAssigned}</td>

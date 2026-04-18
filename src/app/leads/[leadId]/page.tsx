@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, Phone, MessageCircle } from "lucide-react";
 
@@ -14,6 +15,10 @@ export default async function LeadDetailPage({
 }: {
   params: Promise<{ leadId: string }>;
 }) {
+  const cookieStore = await cookies();
+  const initialSidebarCollapsed =
+    cookieStore.get("sidebar-collapsed")?.value === "true";
+
   const user = await requireUser();
   const { leadId } = await params;
 
@@ -37,6 +42,7 @@ export default async function LeadDetailPage({
       <Sidebar
         user={{ name: user.name, email: user.email, role: user.role }}
         managerMode={canReassign}
+        initialCollapsed={initialSidebarCollapsed}
       />
 
       <main className="main-content pt-14 lg:pt-0">

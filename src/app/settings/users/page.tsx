@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { ArrowLeft } from "lucide-react";
 
 import { Sidebar } from "@/components/sidebar";
@@ -7,6 +8,10 @@ import { requireUser } from "@/lib/auth";
 import { listManagedUsers } from "@/lib/user-service";
 
 export default async function UsersPage() {
+  const cookieStore = await cookies();
+  const initialSidebarCollapsed =
+    cookieStore.get("sidebar-collapsed")?.value === "true";
+
   const user = await requireUser(["ADMIN"]);
   const users = await listManagedUsers();
 
@@ -15,6 +20,7 @@ export default async function UsersPage() {
       <Sidebar
         user={{ name: user.name, email: user.email, role: user.role }}
         managerMode
+        initialCollapsed={initialSidebarCollapsed}
       />
 
       <main className="main-content pt-14 lg:pt-0">

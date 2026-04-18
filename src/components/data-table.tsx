@@ -13,6 +13,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { format } from "date-fns";
+import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
@@ -37,6 +38,7 @@ type LeadRow = {
   status: LeadStatusValue;
   priority: LeadPriorityValue;
   nextFollowUpAt?: Date | string | null;
+  createdAt?: Date | string | null;
   campaignName?: string | null;
   source?: string | null;
   jeeRankRange?: string | null;
@@ -76,6 +78,29 @@ function toDateTimeLocal(date?: Date | string | null) {
   }
 
   return format(new Date(date), "yyyy-MM-dd'T'HH:mm");
+}
+
+function relativeTime(date?: Date | string | null) {
+  if (!date) return null;
+  const target = new Date(date);
+  const now = new Date();
+  const diffMs = target.getTime() - now.getTime();
+  const label = formatDistanceToNow(target, { addSuffix: true });
+  return { label, isFuture: diffMs > 0 };
+}
+
+function leadAgeDays(createdAt?: Date | string | null) {
+  if (!createdAt) return 0;
+  return Math.floor(
+    (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24),
+  );
+}
+
+function copyPhone(phone: string) {
+  navigator.clipboard.writeText(phone).then(
+    () => toast.success("Phone number copied!"),
+    () => toast.error("Failed to copy"),
+  );
 }
 
 export function DataTable({
@@ -286,27 +311,33 @@ export function DataTable({
             {
               id: "select",
               header: ({ table }) => (
-                <input
-                  type="checkbox"
-                  checked={table.getIsAllPageRowsSelected()}
-                  ref={(input) => {
-                    if (input) {
-                      input.indeterminate =
-                        table.getIsSomePageRowsSelected() &&
-                        !table.getIsAllPageRowsSelected();
-                    }
-                  }}
-                  onChange={table.getToggleAllPageRowsSelectedHandler()}
-                  aria-label="Select all rows on this page"
-                />
+                <label className="flex h-8 w-8 cursor-pointer items-center justify-center">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 cursor-pointer"
+                    checked={table.getIsAllPageRowsSelected()}
+                    ref={(input) => {
+                      if (input) {
+                        input.indeterminate =
+                          table.getIsSomePageRowsSelected() &&
+                          !table.getIsAllPageRowsSelected();
+                      }
+                    }}
+                    onChange={table.getToggleAllPageRowsSelectedHandler()}
+                    aria-label="Select all rows on this page"
+                  />
+                </label>
               ),
               cell: ({ row }) => (
-                <input
-                  type="checkbox"
-                  checked={row.getIsSelected()}
-                  onChange={row.getToggleSelectedHandler()}
-                  aria-label={`Select lead ${row.original.name}`}
-                />
+                <label className="flex h-8 w-8 cursor-pointer items-center justify-center">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 cursor-pointer"
+                    checked={row.getIsSelected()}
+                    onChange={row.getToggleSelectedHandler()}
+                    aria-label={`Select lead ${row.original.name}`}
+                  />
+                </label>
               ),
               enableSorting: false,
             } satisfies ColumnDef<LeadRow>,
@@ -317,18 +348,37 @@ export function DataTable({
         header: "Lead Info",
         cell: ({ row }) => {
           const lead = row.original;
+          const age = lead.status === "NEW" ? leadAgeDays(lead.createdAt) : 0;
 
           return (
             <div>
               <Link href={`/leads/${lead.id}`} className="group block">
-                <p className="font-semibold text-slate-900 group-hover:text-indigo-600">
+                <p className="font-semibold text-slate-900 group-hover:text-indigo-600 dark:text-slate-100 dark:group-hover:text-indigo-400">
                   {lead.name}
                 </p>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  {lead.phone}
-                  {lead.city ? ` · ${lead.city}` : ""}
-                </p>
               </Link>
+              <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                <button
+                  type="button"
+                  className="cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400"
+                  title="Click to copy phone"
+                  onClick={() => copyPhone(lead.phone)}
+                >
+                  {lead.phone}
+                </button>
+                {lead.city ? <span>· {lead.city}</span> : null}
+              </p>
+              {age >= 2 ? (
+                <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700 dark:bg-red-900/40 dark:text-red-300">
+                  <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                  {age}d old
+                </span>
+              ) : age >= 1 ? (
+                <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                  {age}d old
+                </span>
+              ) : null}
             </div>
           );
         },
@@ -445,24 +495,54 @@ export function DataTable({
         },
       },
       {
+        accessorKey: "createdAt",
+        header: "Created",
+        cell: ({ row }) => {
+          const lead = row.original;
+          if (!lead.createdAt)
+            return <span className="text-sm text-slate-400">-</span>;
+          return (
+            <span className="whitespace-nowrap text-xs text-slate-500">
+              {format(new Date(lead.createdAt), "dd MMM yyyy")}
+            </span>
+          );
+        },
+      },
+      {
         accessorKey: "nextFollowUpAt",
         header: "Follow-up",
         cell: ({ row }) => {
           const lead = row.original;
+          const rel = relativeTime(lead.nextFollowUpAt);
 
           return (
-            <input
-              type="datetime-local"
-              className="h-8 rounded-md border border-transparent bg-slate-50 px-2 text-xs outline-none transition-colors hover:border-slate-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-              value={toDateTimeLocal(lead.nextFollowUpAt)}
-              onChange={(e) => {
-                const value = e.target.value;
+            <div>
+              <input
+                type="datetime-local"
+                className="h-8 rounded-md border border-transparent bg-slate-50 px-2 text-xs outline-none transition-colors hover:border-slate-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:focus:border-indigo-400"
+                value={toDateTimeLocal(lead.nextFollowUpAt)}
+                onChange={(e) => {
+                  const value = e.target.value;
 
-                updateLead(lead.id, {
-                  nextFollowUpAt: value ? new Date(value).toISOString() : null,
-                });
-              }}
-            />
+                  updateLead(lead.id, {
+                    nextFollowUpAt: value
+                      ? new Date(value).toISOString()
+                      : null,
+                  });
+                }}
+              />
+              {rel && (
+                <p
+                  className={`mt-0.5 text-[10px] font-medium ${
+                    rel.isFuture
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : "text-red-600 dark:text-red-400"
+                  }`}
+                >
+                  {rel.label}
+                </p>
+              )}
+            </div>
           );
         },
       },
@@ -474,10 +554,10 @@ export function DataTable({
 
           return (
             <div>
-              <p className="text-sm text-slate-700">
+              <p className="text-sm text-slate-700 dark:text-slate-300">
                 {lead.campaignName ?? lead.source ?? "-"}
               </p>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-400 dark:text-slate-500">
                 {lead._count.activities} touchpoint
                 {lead._count.activities === 1 ? "" : "s"}
               </p>
@@ -618,14 +698,14 @@ export function DataTable({
 
   return (
     <div className="space-y-3">
-      {adminMode ? (
-        <div className="rounded-lg border border-slate-100 bg-white p-3 shadow-sm">
+      {adminMode && (selectedCount > 0 || activeFilterCount > 0) ? (
+        <div className="rounded-lg border border-slate-100 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
               <span>
                 Selected: <strong>{selectedCount}</strong>
               </span>
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-300">
                 Active filters: {activeFilterCount}
               </span>
             </div>
@@ -699,7 +779,7 @@ export function DataTable({
               >
                 {bulkPendingAction === "delete-filtered"
                   ? "Deleting..."
-                  : "Delete All Filtered"}
+                  : `Delete All Filtered (${totalRows})`}
               </Button>
             </div>
 
@@ -782,22 +862,22 @@ export function DataTable({
               >
                 {bulkPendingAction === "assign-filtered"
                   ? "Assigning..."
-                  : "Assign All Filtered"}
+                  : `Assign All Filtered (${totalRows})`}
               </Button>
             </div>
           </div>
         </div>
       ) : null}
 
-      <div className="overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-xl border border-slate-100 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-100 bg-slate-50 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+          <thead className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
                   <th
                     key={header.id}
-                    className="p-4 transition-colors hover:bg-slate-100"
+                    className="p-4 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
                     onClick={
                       header.column.getCanSort()
                         ? header.column.getToggleSortingHandler()
@@ -826,27 +906,37 @@ export function DataTable({
             ))}
           </thead>
 
-          <tbody className="divide-y divide-slate-100">
-            {table.getRowModel().rows.map((row) => (
-              <tr
-                key={row.id}
-                className={`transition-colors hover:bg-slate-50/70 ${
-                  row.getIsSelected() ? "bg-indigo-50/60" : ""
-                }`}
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="p-4 align-middle">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
-              </tr>
-            ))}
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+            {table.getRowModel().rows.map((row) => {
+              const isUnassigned = !row.original.assignedTo;
+              return (
+                <tr
+                  key={row.id}
+                  className={
+                    row.getIsSelected()
+                      ? "bg-indigo-50/60 dark:bg-indigo-900/30"
+                      : isUnassigned
+                        ? "bg-amber-100/60 border-l-2 border-l-amber-400 dark:bg-amber-900/20 dark:border-l-amber-500"
+                        : ""
+                  }
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <td key={cell.id} className="p-4 align-middle">
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext(),
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
 
             {table.getRowModel().rows.length === 0 ? (
               <tr>
                 <td
                   colSpan={columns.length}
-                  className="p-8 text-center text-slate-500"
+                  className="p-8 text-center text-slate-500 dark:text-slate-400"
                 >
                   No leads found.
                 </td>
@@ -856,17 +946,17 @@ export function DataTable({
         </table>
       </div>
 
-      <div className="flex flex-col gap-2 rounded-lg border border-slate-100 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-slate-500">
+      <div className="flex flex-col gap-2 rounded-lg border border-slate-100 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:border-slate-700 dark:bg-slate-800">
+        <p className="text-sm text-slate-500 dark:text-slate-400">
           Showing {pageStart}-{pageEnd} of {totalRows} loaded lead
           {totalRows === 1 ? "" : "s"}
         </p>
 
         <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2 text-sm text-slate-600">
+          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
             Rows
             <select
-              className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm"
+              className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
               value={table.getState().pagination.pageSize}
               onChange={(event) => {
                 table.setPageSize(Number(event.target.value));

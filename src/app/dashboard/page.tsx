@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 
 import { AddLeadModal } from "@/components/add-lead-modal";
-import { DashboardAutoAssignCard } from "@/components/dashboard-auto-assign-card";
+import { AutoAssignToggle } from "@/components/auto-assign-toggle";
+import { DashboardBottomSection } from "@/components/dashboard-bottom-section";
 import { LeadQueueFilters } from "@/components/lead-queue-filters";
 import { CsvImportCard } from "@/components/csv-import-card";
 import { DataTable } from "@/components/data-table";
@@ -27,6 +29,10 @@ export default async function DashboardPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const cookieStore = await cookies();
+  const initialSidebarCollapsed =
+    cookieStore.get("sidebar-collapsed")?.value === "true";
+
   const user = await requireUser();
   const query = await searchParams;
 
@@ -140,15 +146,16 @@ export default async function DashboardPage({
       <Sidebar
         user={{ name: user.name, email: user.email, role: user.role }}
         managerMode={managerMode}
+        initialCollapsed={initialSidebarCollapsed}
       />
 
       <main className="main-content pt-14 lg:pt-0">
-        <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mx-auto space-y-6 px-4 py-6 sm:px-6 lg:px-8">
           {/* Page header */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="page-title">Dashboard</h1>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                 {user.role === "TELECALLER"
                   ? "Your active counselling pipeline"
                   : "Meta ads lead command center"}
@@ -170,19 +177,22 @@ export default async function DashboardPage({
                   Export report
                 </a>
               )}
+              {adminMode && (
+                <AutoAssignToggle initialEnabled={autoAssignEnabled} />
+              )}
             </div>
           </div>
 
           {/* Stats row */}
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5 mb-6">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5 mb-4">
             <Link href={buildDashboardHref({ due: "all" })}>
               <article
-                className={`metric-card flex flex-col justify-center border-slate-200 shadow-sm transition-transform hover:-translate-y-0.5 ${!filters.status && filters.due === "all" ? "ring-2 ring-indigo-300" : ""}`}
+                className={`flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-transform hover:-translate-y-0.5 dark:border-slate-700 dark:bg-slate-800 ${!filters.status && filters.due === "all" ? "ring-2 ring-indigo-300" : ""}`}
               >
-                <p className="mb-1 text-xs font-medium uppercase tracking-wider text-slate-500">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Total Leads
                 </p>
-                <p className="text-2xl font-bold text-slate-900">
+                <p className="text-xl font-bold text-slate-900 dark:text-slate-100">
                   {stats.totalLeads}
                 </p>
               </article>
@@ -192,12 +202,12 @@ export default async function DashboardPage({
               href={buildDashboardHref({ status: "CONVERTED", due: "all" })}
             >
               <article
-                className={`metric-card flex flex-col justify-center border-slate-200 shadow-sm transition-transform hover:-translate-y-0.5 ${filters.status === "CONVERTED" ? "ring-2 ring-emerald-300" : ""}`}
+                className={`flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-transform hover:-translate-y-0.5 dark:border-slate-700 dark:bg-slate-800 ${filters.status === "CONVERTED" ? "ring-2 ring-emerald-300" : ""}`}
               >
-                <p className="mb-1 text-xs font-medium uppercase tracking-wider text-slate-500">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Converted
                 </p>
-                <p className="text-2xl font-bold text-emerald-600">
+                <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
                   {stats.converted}
                 </p>
               </article>
@@ -205,12 +215,12 @@ export default async function DashboardPage({
 
             <Link href={buildDashboardHref({ status: "NEW", due: "all" })}>
               <article
-                className={`metric-card flex flex-col justify-center border-slate-200 shadow-sm transition-transform hover:-translate-y-0.5 ${filters.status === "NEW" ? "ring-2 ring-indigo-200" : ""}`}
+                className={`flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-transform hover:-translate-y-0.5 dark:border-slate-700 dark:bg-slate-800 ${filters.status === "NEW" ? "ring-2 ring-indigo-200" : ""}`}
               >
-                <p className="mb-1 text-xs font-medium uppercase tracking-wider text-slate-500">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   New
                 </p>
-                <p className="text-2xl font-bold text-indigo-600">
+                <p className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
                   {stats.newLeads}
                 </p>
               </article>
@@ -220,12 +230,12 @@ export default async function DashboardPage({
               href={buildDashboardHref({ status: undefined, due: "today" })}
             >
               <article
-                className={`metric-card flex flex-col justify-center border-slate-200 shadow-sm transition-transform hover:-translate-y-0.5 ${filters.due === "today" ? "ring-2 ring-amber-200" : ""}`}
+                className={`flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-transform hover:-translate-y-0.5 dark:border-slate-700 dark:bg-slate-800 ${filters.due === "today" ? "ring-2 ring-amber-200" : ""}`}
               >
-                <p className="mb-1 text-xs font-medium uppercase tracking-wider text-slate-500">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Due
                 </p>
-                <p className="text-2xl font-bold text-amber-600">
+                <p className="text-xl font-bold text-amber-600 dark:text-amber-400">
                   {stats.dueToday}
                 </p>
               </article>
@@ -235,12 +245,12 @@ export default async function DashboardPage({
               href={buildDashboardHref({ status: undefined, due: "overdue" })}
             >
               <article
-                className={`metric-card flex flex-col justify-center border-slate-200 bg-red-50 shadow-sm transition-transform hover:-translate-y-0.5 ${filters.due === "overdue" ? "ring-2 ring-red-200" : ""}`}
+                className={`flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-red-50 px-4 py-3 shadow-sm transition-transform hover:-translate-y-0.5 dark:border-slate-700 dark:bg-red-900/20 ${filters.due === "overdue" ? "ring-2 ring-red-200" : ""}`}
               >
-                <p className="mb-1 text-xs font-medium uppercase tracking-wider text-red-600">
+                <p className="text-xs font-semibold uppercase tracking-wider text-red-600 dark:text-red-400">
                   Overdue
                 </p>
-                <p className="text-2xl font-bold text-red-700">
+                <p className="text-xl font-bold text-red-700 dark:text-red-300">
                   {stats.overdue}
                 </p>
               </article>
@@ -251,10 +261,10 @@ export default async function DashboardPage({
           <section className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-xl font-semibold text-slate-900 tracking-tight">
+                <h2 className="text-xl font-semibold text-slate-900 tracking-tight dark:text-slate-100">
                   Lead Queue
                 </h2>
-                <p className="mt-0.5 text-sm text-slate-500">
+                <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
                   {leads.length} lead{leads.length === 1 ? "" : "s"} matched
                   your criteria
                 </p>
@@ -283,32 +293,33 @@ export default async function DashboardPage({
             />
           </section>
 
-          {/* Insights & Auxiliary tools */}
-          <div
-            className={
-              managerMode ? "grid gap-6 xl:grid-cols-[1fr_380px]" : "space-y-6"
-            }
-          >
-            {/* Insights */}
-            <div className="space-y-6">
-              <DashboardInsights
-                managerMode={managerMode}
-                reportExportHref={reportExportHref}
-                reporting={reporting}
-                tableFilters={filters}
-              />
-            </div>
-
-            {/* Sidebar auxiliary tools */}
-            {managerMode ? (
+          {/* Analytics & Tools (collapsible) */}
+          <DashboardBottomSection>
+            <div
+              className={
+                managerMode
+                  ? "grid gap-6 xl:grid-cols-[1fr_380px]"
+                  : "space-y-6"
+              }
+            >
+              {/* Insights */}
               <div className="space-y-6">
-                {adminMode ? (
-                  <DashboardAutoAssignCard initialEnabled={autoAssignEnabled} />
-                ) : null}
-                <CsvImportCard templateHref="/lead-import-template.csv" />
+                <DashboardInsights
+                  managerMode={managerMode}
+                  reportExportHref={reportExportHref}
+                  reporting={reporting}
+                  tableFilters={filters}
+                />
               </div>
-            ) : null}
-          </div>
+
+              {/* Auxiliary tools */}
+              {managerMode ? (
+                <div className="space-y-6">
+                  <CsvImportCard templateHref="/lead-import-template.csv" />
+                </div>
+              ) : null}
+            </div>
+          </DashboardBottomSection>
         </div>
       </main>
     </>

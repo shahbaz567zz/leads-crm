@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
+import { cookies } from "next/headers";
 
 import { Toaster } from "react-hot-toast";
 
@@ -22,17 +23,20 @@ export const metadata: Metadata = {
     "Internal CRM for Meta Ads lead capture, telecaller assignments, meeting tracking, and admissions conversion workflow.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const theme = cookieStore.get("theme")?.value;
+
   return (
     <html
       lang="en"
-      className={`${displayFont.variable} ${monoFont.variable} h-full antialiased`}
+      className={`${displayFont.variable} ${monoFont.variable} h-full antialiased ${theme === "dark" ? "dark" : ""}`}
     >
-      <body className="min-h-full text-slate-900">
+      <body className="min-h-full text-slate-900 dark:text-slate-100">
         {children}
         <Toaster position="top-right" />
       </body>
