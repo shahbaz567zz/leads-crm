@@ -50,6 +50,9 @@ type CsvLeadPayloadDraft = {
   twelfthLocation?: string;
   jeeRankRange?: string;
   courseInterest?: string;
+  dynamicField1?: string;
+  dynamicField2?: string;
+  dynamicField3?: string;
   source?: string;
   campaignName?: string;
   priority?: LeadPriorityValue;
@@ -241,6 +244,21 @@ function buildImportPayload(
         options.columnMapping,
         "courseInterest",
       ),
+      dynamicField1: getMappedField(
+        record,
+        options.columnMapping,
+        "dynamicField1",
+      ),
+      dynamicField2: getMappedField(
+        record,
+        options.columnMapping,
+        "dynamicField2",
+      ),
+      dynamicField3: getMappedField(
+        record,
+        options.columnMapping,
+        "dynamicField3",
+      ),
       source,
       campaignName,
       priority,
@@ -288,6 +306,9 @@ async function findExistingLeadForImport(
       twelfthLocation: true,
       jeeRankRange: true,
       courseInterest: true,
+      dynamicField1: true,
+      dynamicField2: true,
+      dynamicField3: true,
       source: true,
       campaignName: true,
       adsetName: true,
@@ -389,6 +410,12 @@ async function mergeExistingLeadFromMetaCsv(
         existingLead.jeeRankRange ?? importedLead.payload.jeeRankRange,
       courseInterest:
         existingLead.courseInterest ?? importedLead.payload.courseInterest,
+      dynamicField1:
+        existingLead.dynamicField1 ?? importedLead.payload.dynamicField1,
+      dynamicField2:
+        existingLead.dynamicField2 ?? importedLead.payload.dynamicField2,
+      dynamicField3:
+        existingLead.dynamicField3 ?? importedLead.payload.dynamicField3,
       source: shouldOverwriteSource(
         existingLead.source,
         importedLead.payload.source,

@@ -2,23 +2,28 @@
 
 import { Save, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 
 import {
   buildCsvPreview,
   buildSuggestedCsvMapping,
-  CSV_IMPORT_FIELD_DEFINITIONS,
   CSV_IMPORT_REQUIRED_FIELDS,
+  getCsvImportFieldDefinitions,
   type CsvImportColumnMapping,
   type CsvImportFieldKey,
 } from "@/lib/csv-import-mapping";
 import type { CsvImportResult } from "@/lib/csv-import";
+import type { DynamicLeadFieldLabels } from "@/lib/lead-field-labels";
 
 type CsvImportCardProps = {
   templateHref: string;
+  dynamicFieldLabels: DynamicLeadFieldLabels;
 };
 
-export function CsvImportCard({ templateHref }: CsvImportCardProps) {
+export function CsvImportCard({
+  templateHref,
+  dynamicFieldLabels,
+}: CsvImportCardProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [file, setFile] = useState<File | null>(null);
@@ -36,6 +41,10 @@ export function CsvImportCard({ templateHref }: CsvImportCardProps) {
     null,
   );
   const [savingMapping, setSavingMapping] = useState(false);
+  const fieldDefinitions = useMemo(
+    () => getCsvImportFieldDefinitions(dynamicFieldLabels),
+    [dynamicFieldLabels],
+  );
 
   function getMissingRequiredMappings(mapping: CsvImportColumnMapping) {
     return CSV_IMPORT_REQUIRED_FIELDS.filter((fieldKey) => !mapping[fieldKey]);
@@ -415,7 +424,7 @@ export function CsvImportCard({ templateHref }: CsvImportCardProps) {
               ) : null}
 
               <div className="grid gap-3 md:grid-cols-2">
-                {CSV_IMPORT_FIELD_DEFINITIONS.map((field) => (
+                {fieldDefinitions.map((field) => (
                   <label key={field.key} className="space-y-1">
                     <span className="text-sm font-medium text-slate-700">
                       {field.label}
@@ -465,7 +474,7 @@ export function CsvImportCard({ templateHref }: CsvImportCardProps) {
                       </tr>
                     </thead>
                     <tbody>
-                      {CSV_IMPORT_FIELD_DEFINITIONS.map((field) => (
+                      {fieldDefinitions.map((field) => (
                         <tr
                           key={`preview-${field.key}`}
                           className="border-t border-slate-100"

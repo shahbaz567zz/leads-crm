@@ -1,7 +1,13 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useCallback, useEffect, useRef, useTransition } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useTransition,
+} from "react";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import {
@@ -12,9 +18,11 @@ import {
 } from "@/lib/crm-constants";
 
 export function LeadQueueFilters({
+  actions,
   managerMode,
   telecallers,
 }: {
+  actions?: ReactNode;
   managerMode: boolean;
   telecallers: { id: string; name: string }[];
 }) {
@@ -164,6 +172,12 @@ export function LeadQueueFilters({
           ))}
         </Select>
       )}
+
+      {actions ? (
+        <div className="relative z-10 ml-auto flex items-center gap-2">
+          {actions}
+        </div>
+      ) : null}
     </div>
   );
 }

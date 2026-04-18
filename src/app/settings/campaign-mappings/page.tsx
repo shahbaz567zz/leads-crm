@@ -4,8 +4,10 @@ import { ArrowLeft } from "lucide-react";
 
 import { Sidebar } from "@/components/sidebar";
 import { CampaignMappingList } from "@/components/campaign-mapping-list";
+import { LeadFieldSettingsCard } from "@/components/lead-field-settings-card";
 import { canManageAssignments, requireUser } from "@/lib/auth";
 import { listCampaignMappings } from "@/lib/campaign-mapping-service";
+import { getDynamicLeadFieldLabels } from "@/lib/lead-field-settings";
 
 export default async function CampaignMappingsPage() {
   const cookieStore = await cookies();
@@ -24,7 +26,10 @@ export default async function CampaignMappingsPage() {
     );
   }
 
-  const mappings = await listCampaignMappings();
+  const [mappings, dynamicFieldLabels] = await Promise.all([
+    listCampaignMappings(),
+    getDynamicLeadFieldLabels(),
+  ]);
   const isAdmin = user.role === "ADMIN";
 
   return (
@@ -55,7 +60,13 @@ export default async function CampaignMappingsPage() {
             </div>
           </div>
 
-          <CampaignMappingList initialMappings={mappings} isAdmin={isAdmin} />
+          <LeadFieldSettingsCard initialLabels={dynamicFieldLabels} />
+
+          <CampaignMappingList
+            initialMappings={mappings}
+            isAdmin={isAdmin}
+            dynamicFieldLabels={dynamicFieldLabels}
+          />
         </div>
       </main>
     </>

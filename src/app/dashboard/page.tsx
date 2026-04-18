@@ -4,10 +4,9 @@ import { cookies } from "next/headers";
 import { AddLeadModal } from "@/components/add-lead-modal";
 import { AutoAssignToggle } from "@/components/auto-assign-toggle";
 import { DashboardBottomSection } from "@/components/dashboard-bottom-section";
-import { LeadQueueFilters } from "@/components/lead-queue-filters";
 import { CsvImportCard } from "@/components/csv-import-card";
-import { DataTable } from "@/components/data-table";
 import { DashboardInsights } from "@/components/dashboard-insights";
+import { LeadQueueSection } from "@/components/lead-queue-section";
 import { Sidebar } from "@/components/sidebar";
 import { canManageAssignments, requireUser } from "@/lib/auth";
 import {
@@ -19,6 +18,7 @@ import {
   getDashboardData,
   type TelecallerOption,
 } from "@/lib/lead-service";
+import { getDynamicLeadFieldLabels } from "@/lib/lead-field-settings";
 
 function readSingle(value?: string | string[]) {
   return Array.isArray(value) ? value[0] : value;
@@ -32,6 +32,8 @@ export default async function DashboardPage({
   const cookieStore = await cookies();
   const initialSidebarCollapsed =
     cookieStore.get("sidebar-collapsed")?.value === "true";
+  const initialColumnVisibilityPreference =
+    cookieStore.get("lead-table-columns")?.value ?? null;
 
   const user = await requireUser();
   const query = await searchParams;
@@ -102,11 +104,15 @@ export default async function DashboardPage({
     return params.size ? `/dashboard?${params.toString()}` : "/dashboard";
   }
 
-  const [{ leads, stats, telecallers, reporting }, autoAssignEnabled] =
-    await Promise.all([
-      getDashboardData(user, filters),
-      user.role === "ADMIN" ? getAutoAssignEnabled() : Promise.resolve(false),
-    ]);
+  const [
+    { leads, stats, telecallers, reporting },
+    autoAssignEnabled,
+    dynamicFieldLabels,
+  ] = await Promise.all([
+    getDashboardData(user, filters),
+    user.role === "ADMIN" ? getAutoAssignEnabled() : Promise.resolve(false),
+    getDynamicLeadFieldLabels(),
+  ]);
   const managerMode = canManageAssignments(user);
   const adminMode = user.role === "ADMIN";
 
@@ -271,17 +277,7 @@ export default async function DashboardPage({
               </div>
             </div>
 
-            {/* Realtime Filters */}
-            <LeadQueueFilters
-              managerMode={managerMode}
-              telecallers={telecallers.map((tc: TelecallerOption) => ({
-                id: tc.id,
-                name: tc.name,
-              }))}
-            />
-
-            {/* Data Table */}
-            <DataTable
+            <LeadQueueSection
               data={leads}
               telecallers={telecallers.map((tc: TelecallerOption) => ({
                 id: tc.id,
@@ -289,6 +285,10 @@ export default async function DashboardPage({
               }))}
               managerMode={managerMode}
               adminMode={adminMode}
+              dynamicFieldLabels={dynamicFieldLabels}
+              initialColumnVisibilityPreference={
+                initialColumnVisibilityPreference
+              }
               currentFilters={filters}
             />
           </section>
@@ -315,7 +315,10 @@ export default async function DashboardPage({
               {/* Auxiliary tools */}
               {managerMode ? (
                 <div className="space-y-6">
-                  <CsvImportCard templateHref="/lead-import-template.csv" />
+                  <CsvImportCard
+                    templateHref="/lead-import-template.csv"
+                    dynamicFieldLabels={dynamicFieldLabels}
+                  />
                 </div>
               ) : null}
             </div>

@@ -1,18 +1,44 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
-import { Pencil, Plus, Trash2, X } from "lucide-react";
+import { useEffect, useId, useState, useTransition } from "react";
+import { Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import toast from "react-hot-toast";
 
 import {
-  CSV_IMPORT_FIELD_DEFINITIONS,
+  getCampaignMappingFieldDefinitions,
+  getCampaignMappingFieldKeys,
+  type CampaignMappingSourceValue,
   type CsvImportColumnMapping,
 } from "@/lib/csv-import-mapping";
+import type { DynamicLeadFieldLabels } from "@/lib/lead-field-labels";
+
+type DiscoveryField = {
+  value: string;
+  label: string;
+  occurrenceCount: number;
+  sampleValues: string[];
+  origins: Array<"lead_sample" | "meta_form">;
+};
+
+type DiscoveryTarget = {
+  formId: string | null;
+  campaignName: string | null;
+  pageId: string | null;
+  leadCount: number;
+  lastSeenAt: string;
+  label: string;
+};
+
+type DiscoverySummary = {
+  sampleLeadCount: number;
+  resolvedBy: "formId" | "campaignName" | null;
+  metaFormFetched: boolean;
+};
 
 type MappingRow = {
   id: string;
-  source: "META" | "GOOGLE" | "CSV";
+  source: CampaignMappingSourceValue;
   label: string;
   campaignName: string | null;
   formId: string | null;
@@ -26,14 +52,77 @@ const SOURCE_COLORS: Record<string, string> = {
   CSV: "bg-slate-100 text-slate-700",
 };
 
-const SOURCES = ["META", "GOOGLE", "CSV"] as const;
+const SOURCES: CampaignMappingSourceValue[] = ["META", "GOOGLE", "CSV"];
+
+function countFilledMappingFields(
+  mapping: CsvImportColumnMapping,
+  source: CampaignMappingSourceValue,
+) {
+  return getCampaignMappingFieldKeys(source).filter((fieldKey) =>
+    Boolean(mapping[fieldKey]?.trim()),
+  ).length;
+}
+
+function sanitizeMappingForSource(
+  source: CampaignMappingSourceValue,
+  mapping: CsvImportColumnMapping,
+) {
+  const next: CsvImportColumnMapping = {};
+
+  getCampaignMappingFieldKeys(source).forEach((fieldKey) => {
+    const value = mapping[fieldKey]?.trim();
+
+    if (value) {
+      next[fieldKey] = value;
+    }
+  });
+
+  return next;
+}
+
+function buildTargetValue(target: {
+  formId: string | null;
+  campaignName: string | null;
+}) {
+  return `${target.formId ?? ""}::${target.campaignName ?? ""}`;
+}
+
+function getDiscoverySummaryText(
+  source: CampaignMappingSourceValue,
+  summary: DiscoverySummary,
+  fieldCount: number,
+) {
+  const parts = [];
+
+  if (fieldCount > 0) {
+    parts.push(
+      `Detected ${fieldCount} exact field${fieldCount === 1 ? "" : "s"}`,
+    );
+  } else {
+    parts.push("No custom fields detected yet");
+  }
+
+  if (summary.sampleLeadCount > 0) {
+    parts.push(
+      `from ${summary.sampleLeadCount} recent ${source === "META" ? "Meta" : "Google"} lead${summary.sampleLeadCount === 1 ? "" : "s"}`,
+    );
+  }
+
+  if (summary.metaFormFetched) {
+    parts.push("plus live Meta form questions");
+  }
+
+  return parts.join(" ");
+}
 
 export function CampaignMappingList({
   initialMappings,
   isAdmin,
+  dynamicFieldLabels,
 }: {
   initialMappings: MappingRow[];
   isAdmin: boolean;
+  dynamicFieldLabels: DynamicLeadFieldLabels;
 }) {
   const router = useRouter();
   const [deleting, startDelete] = useTransition();
@@ -101,9 +190,10 @@ export function CampaignMappingList({
             </thead>
             <tbody>
               {initialMappings.map((mapping) => {
-                const fieldCount = Object.keys(
+                const fieldCount = countFilledMappingFields(
                   mapping.columnMapping ?? {},
-                ).length;
+                  mapping.source,
+                );
 
                 return (
                   <tr key={mapping.id}>
@@ -159,6 +249,7 @@ export function CampaignMappingList({
 
       {formOpen && (
         <MappingFormModal
+          dynamicFieldLabels={dynamicFieldLabels}
           existing={editingMapping}
           onClose={() => {
             setFormOpen(false);
@@ -175,17 +266,20 @@ export function CampaignMappingList({
 /* ------------------------------------------------------------------ */
 
 function MappingFormModal({
+  dynamicFieldLabels,
   existing,
   onClose,
 }: {
+  dynamicFieldLabels: DynamicLeadFieldLabels;
   existing: MappingRow | null;
   onClose: () => void;
 }) {
   const router = useRouter();
+  const discoveredFieldListId = useId();
   const [saving, startSave] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const [source, setSource] = useState<"META" | "GOOGLE" | "CSV">(
+  const [source, setSource] = useState<CampaignMappingSourceValue>(
     existing?.source ?? "META",
   );
   const [label, setLabel] = useState(existing?.label ?? "");
@@ -196,6 +290,182 @@ function MappingFormModal({
   const [columnMapping, setColumnMapping] = useState<CsvImportColumnMapping>(
     existing?.columnMapping ?? {},
   );
+  const [recentTargets, setRecentTargets] = useState<DiscoveryTarget[]>([]);
+  const [discoveredFields, setDiscoveredFields] = useState<DiscoveryField[]>(
+    [],
+  );
+  const [discoverySummary, setDiscoverySummary] =
+    useState<DiscoverySummary | null>(null);
+  const [autoDetectedMapping, setAutoDetectedMapping] =
+    useState<CsvImportColumnMapping>({});
+  const [loadingTargets, setLoadingTargets] = useState(false);
+  const [discoveringFields, setDiscoveringFields] = useState(false);
+  const [discoveryLoaded, setDiscoveryLoaded] = useState(false);
+
+  const fieldDefinitions = getCampaignMappingFieldDefinitions(
+    source,
+    dynamicFieldLabels,
+  );
+  const isWebhookSource = source !== "CSV";
+  const selectedTargetValue = recentTargets.find(
+    (target) =>
+      target.formId === (formId.trim() || null) &&
+      target.campaignName === (campaignName.trim() || null),
+  )
+    ? buildTargetValue({
+        formId: formId.trim() || null,
+        campaignName: campaignName.trim() || null,
+      })
+    : "";
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!isWebhookSource) {
+      setRecentTargets([]);
+      setDiscoveredFields([]);
+      setDiscoverySummary(null);
+      setAutoDetectedMapping({});
+      setDiscoveryLoaded(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setLoadingTargets(true);
+
+    void fetch(`/api/campaign-mappings/discovery?source=${source}`)
+      .then(async (response) => {
+        const body = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          return;
+        }
+
+        if (!cancelled) {
+          setRecentTargets(
+            Array.isArray(body.recentTargets) ? body.recentTargets : [],
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRecentTargets([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingTargets(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isWebhookSource, source]);
+
+  async function handleDiscoverFields() {
+    if (!isWebhookSource) {
+      return;
+    }
+
+    if (!formId.trim() && !campaignName.trim()) {
+      setError("Enter Form ID or Campaign Name before detecting fields.");
+      return;
+    }
+
+    const searchParams = new URLSearchParams({ source });
+
+    if (formId.trim()) {
+      searchParams.set("formId", formId.trim());
+    }
+
+    if (campaignName.trim()) {
+      searchParams.set("campaignName", campaignName.trim());
+    }
+
+    setError(null);
+    setDiscoveringFields(true);
+
+    try {
+      const response = await fetch(
+        `/api/campaign-mappings/discovery?${searchParams.toString()}`,
+      );
+      const body = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setError(body.error ?? "Unable to detect source fields.");
+        return;
+      }
+
+      const nextFields = Array.isArray(body.fields) ? body.fields : [];
+      const nextRecentTargets = Array.isArray(body.recentTargets)
+        ? body.recentTargets
+        : [];
+      const nextSuggestedMapping = sanitizeMappingForSource(
+        source,
+        (body.suggestedMapping as CsvImportColumnMapping | undefined) ?? {},
+      );
+      const nextAutoDetectedMapping = sanitizeMappingForSource(
+        source,
+        (body.autoDetectedMapping as CsvImportColumnMapping | undefined) ?? {},
+      );
+      const nextSummary: DiscoverySummary = {
+        sampleLeadCount:
+          typeof body.sampleLeadCount === "number" ? body.sampleLeadCount : 0,
+        resolvedBy:
+          body.resolvedBy === "formId" || body.resolvedBy === "campaignName"
+            ? body.resolvedBy
+            : null,
+        metaFormFetched: Boolean(body.metaFormFetched),
+      };
+
+      setRecentTargets(nextRecentTargets);
+      setDiscoveredFields(nextFields);
+      setAutoDetectedMapping(nextAutoDetectedMapping);
+      setDiscoverySummary(nextSummary);
+      setDiscoveryLoaded(true);
+
+      let appliedCount = 0;
+
+      setColumnMapping((previous) => {
+        const next = { ...previous };
+
+        getCampaignMappingFieldKeys(source).forEach((fieldKey) => {
+          const suggestedValue = nextSuggestedMapping[fieldKey];
+
+          if (!next[fieldKey]?.trim() && suggestedValue) {
+            next[fieldKey] = suggestedValue;
+            appliedCount += 1;
+          }
+        });
+
+        return next;
+      });
+
+      if (nextFields.length > 0) {
+        toast.success(
+          appliedCount > 0
+            ? `Detected ${nextFields.length} fields. Auto-filled ${appliedCount} CRM mapping${appliedCount === 1 ? "" : "s"}.`
+            : `Detected ${nextFields.length} fields for mapping.`,
+        );
+        return;
+      }
+
+      if (source === "GOOGLE" && nextSummary.sampleLeadCount > 0) {
+        toast(
+          "No custom Google questions were found. Standard fields like name, phone, email, and city are already captured automatically.",
+        );
+        return;
+      }
+
+      toast("No fields were detected for this form or campaign yet.");
+    } catch {
+      setError("Unable to detect source fields.");
+    } finally {
+      setDiscoveringFields(false);
+    }
+  }
 
   function handleSubmit() {
     if (!label.trim()) {
@@ -210,6 +480,8 @@ function MappingFormModal({
 
     setError(null);
 
+    const sanitizedMapping = sanitizeMappingForSource(source, columnMapping);
+
     startSave(async () => {
       const response = await fetch("/api/campaign-mappings", {
         method: "POST",
@@ -219,7 +491,7 @@ function MappingFormModal({
           label: label.trim(),
           campaignName: campaignName.trim() || undefined,
           formId: formId.trim() || undefined,
-          columnMapping,
+          columnMapping: sanitizedMapping,
         }),
       });
       const body = await response.json().catch(() => ({}));
@@ -259,7 +531,7 @@ function MappingFormModal({
                 className="w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-sm"
                 value={source}
                 onChange={(e) =>
-                  setSource(e.target.value as "META" | "GOOGLE" | "CSV")
+                  setSource(e.target.value as CampaignMappingSourceValue)
                 }
               >
                 {SOURCES.map((s) => (
@@ -279,55 +551,236 @@ function MappingFormModal({
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="field-label">Campaign Name</label>
-              <input
-                value={campaignName}
-                onChange={(e) => setCampaignName(e.target.value)}
-                placeholder="Delhi Counselling Batch"
-              />
+          {isWebhookSource ? (
+            <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-800">
+                    Fetch Source Fields
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Choose a recent form or campaign, or enter identifiers
+                    manually, then detect the exact external field keys before
+                    mapping them to the CRM.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="button-secondary gap-1.5 text-sm"
+                  disabled={discoveringFields}
+                  onClick={() => void handleDiscoverFields()}
+                >
+                  <Search className="h-4 w-4" />
+                  {discoveringFields ? "Detecting..." : "Detect Fields"}
+                </button>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="field-label">
+                    Recent Forms / Campaigns
+                  </label>
+                  <select
+                    className="w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-sm"
+                    disabled={loadingTargets || recentTargets.length === 0}
+                    value={selectedTargetValue}
+                    onChange={(event) => {
+                      const target = recentTargets.find(
+                        (item) => buildTargetValue(item) === event.target.value,
+                      );
+
+                      if (!target) {
+                        return;
+                      }
+
+                      setFormId(target.formId ?? "");
+                      setCampaignName(target.campaignName ?? "");
+                    }}
+                  >
+                    <option value="">
+                      {loadingTargets
+                        ? "Loading recent forms..."
+                        : recentTargets.length > 0
+                          ? "Select a recent form or campaign"
+                          : "No recent forms detected yet"}
+                    </option>
+                    {recentTargets.map((target) => (
+                      <option
+                        key={`${target.lastSeenAt}-${buildTargetValue(target)}`}
+                        value={buildTargetValue(target)}
+                      >
+                        {`${target.label} · ${target.leadCount} lead${target.leadCount === 1 ? "" : "s"}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="field-label">Campaign Name</label>
+                  <input
+                    value={campaignName}
+                    onChange={(e) => setCampaignName(e.target.value)}
+                    placeholder="Delhi Counselling Batch"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="field-label">Form ID</label>
+                <input
+                  value={formId}
+                  onChange={(e) => setFormId(e.target.value)}
+                  placeholder="Meta or Google form ID"
+                />
+              </div>
+
+              {discoverySummary ? (
+                <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                  {getDiscoverySummaryText(
+                    source,
+                    discoverySummary,
+                    discoveredFields.length,
+                  )}
+                </div>
+              ) : null}
+
+              {discoveredFields.length > 0 ? (
+                <div className="rounded-lg border border-slate-200 bg-white p-4">
+                  <p className="text-sm font-medium text-slate-800">
+                    Detected Fields
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    These are the exact keys that can be selected from the
+                    mapping inputs below.
+                  </p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {discoveredFields.map((field) => (
+                      <div
+                        key={field.value}
+                        className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
+                      >
+                        <p className="text-sm font-medium text-slate-800">
+                          {field.label}
+                        </p>
+                        <p className="mt-1 break-all font-mono text-xs text-slate-500">
+                          {field.value}
+                        </p>
+                        {field.sampleValues[0] ? (
+                          <p className="mt-1 text-xs text-slate-500">
+                            Sample: {field.sampleValues[0]}
+                          </p>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {discoveryLoaded && discoveredFields.length === 0 ? (
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                  {source === "GOOGLE"
+                    ? "No custom Google questions were found for this selection. Standard Google fields like name, phone, email, and city are already captured automatically."
+                    : "No Meta fields were detected for this selection yet. Try another form or campaign, or fetch again after at least one lead arrives."}
+                </div>
+              ) : null}
             </div>
-            <div>
-              <label className="field-label">Form ID</label>
-              <input
-                value={formId}
-                onChange={(e) => setFormId(e.target.value)}
-                placeholder="Meta/Google form ID"
-              />
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="field-label">Campaign Name</label>
+                <input
+                  value={campaignName}
+                  onChange={(e) => setCampaignName(e.target.value)}
+                  placeholder="Delhi Counselling Batch"
+                />
+              </div>
+              <div>
+                <label className="field-label">Form ID</label>
+                <input
+                  value={formId}
+                  onChange={(e) => setFormId(e.target.value)}
+                  placeholder="CSV batch or external form reference"
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           <div>
-            <p className="field-label mb-2">Column → Field Mapping</p>
+            <p className="field-label mb-2">CRM Field Mapping</p>
             <p className="mb-3 text-xs text-slate-500">
-              Enter the exact header name (CSV) or form field name (Meta/Google)
-              that maps to each CRM field.
+              {isWebhookSource
+                ? "Pick a detected field key or type it manually. Campaign, ad, and source metadata are already captured automatically for webhook leads."
+                : "Enter the exact CSV header that maps to each CRM field."}
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
-              {CSV_IMPORT_FIELD_DEFINITIONS.map((field) => (
-                <label key={field.key} className="space-y-1">
-                  <span className="text-sm font-medium text-slate-700">
-                    {field.label}
-                    {field.required ? (
-                      <span className="ml-1 text-red-600">*</span>
+              {fieldDefinitions.map((field) => {
+                const detectedField = discoveredFields.find(
+                  (item) => item.value === columnMapping[field.key],
+                );
+                const autoDetectedValue = autoDetectedMapping[field.key];
+
+                return (
+                  <label key={field.key} className="space-y-1">
+                    <span className="text-sm font-medium text-slate-700">
+                      {field.label}
+                      {!isWebhookSource && field.required ? (
+                        <span className="ml-1 text-red-600">*</span>
+                      ) : null}
+                    </span>
+                    <input
+                      className="h-9 text-sm"
+                      list={
+                        isWebhookSource && discoveredFields.length > 0
+                          ? discoveredFieldListId
+                          : undefined
+                      }
+                      value={columnMapping[field.key] ?? ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setColumnMapping((prev) => ({
+                          ...prev,
+                          [field.key]: value || undefined,
+                        }));
+                      }}
+                      placeholder={
+                        isWebhookSource
+                          ? "Select detected key or type exact field name"
+                          : field.aliases[0]
+                      }
+                    />
+                    {detectedField &&
+                    detectedField.label !== detectedField.value ? (
+                      <p className="text-xs text-slate-500">
+                        Selected label: {detectedField.label}
+                      </p>
                     ) : null}
-                  </span>
-                  <input
-                    className="h-9 text-sm"
-                    value={columnMapping[field.key] ?? ""}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setColumnMapping((prev) => ({
-                        ...prev,
-                        [field.key]: value || undefined,
-                      }));
-                    }}
-                    placeholder={field.aliases[0]}
-                  />
-                </label>
-              ))}
+                    {autoDetectedValue && !columnMapping[field.key] ? (
+                      <p className="text-xs text-emerald-700">
+                        Auto-captured from Google standard field{" "}
+                        {autoDetectedValue}. Add a custom mapping only if your
+                        form uses a custom question instead.
+                      </p>
+                    ) : null}
+                  </label>
+                );
+              })}
             </div>
+
+            {isWebhookSource && discoveredFields.length > 0 ? (
+              <datalist id={discoveredFieldListId}>
+                {discoveredFields.map((field) => (
+                  <option
+                    key={field.value}
+                    value={field.value}
+                    label={
+                      field.label !== field.value
+                        ? `${field.label}`
+                        : (field.sampleValues[0] ?? undefined)
+                    }
+                  />
+                ))}
+              </datalist>
+            ) : null}
           </div>
 
           {error && <div className="alert-error">{error}</div>}

@@ -7,6 +7,7 @@ import { LeadDetailClient } from "@/components/lead-detail-client";
 import { Sidebar } from "@/components/sidebar";
 import { StatusPill } from "@/components/status-pill";
 import { canManageAssignments, requireUser } from "@/lib/auth";
+import { getDynamicLeadFieldLabels } from "@/lib/lead-field-settings";
 import { getLeadDetail, type TelecallerOption } from "@/lib/lead-service";
 import { formatDateTime } from "@/lib/utils";
 
@@ -23,9 +24,13 @@ export default async function LeadDetailPage({
   const { leadId } = await params;
 
   let detail: Awaited<ReturnType<typeof getLeadDetail>>;
+  let dynamicFieldLabels: Awaited<ReturnType<typeof getDynamicLeadFieldLabels>>;
 
   try {
-    detail = await getLeadDetail(leadId, user);
+    [detail, dynamicFieldLabels] = await Promise.all([
+      getLeadDetail(leadId, user),
+      getDynamicLeadFieldLabels(),
+    ]);
   } catch {
     redirect("/dashboard");
   }
@@ -35,6 +40,11 @@ export default async function LeadDetailPage({
   }
 
   const { lead, telecallers } = detail;
+  const leadWithDynamic = lead as typeof lead & {
+    dynamicField1?: string | null;
+    dynamicField2?: string | null;
+    dynamicField3?: string | null;
+  };
   const canReassign = canManageAssignments(user);
 
   return (
@@ -128,6 +138,7 @@ export default async function LeadDetailPage({
           {/* Control + Activity forms */}
           <LeadDetailClient
             canReassign={canReassign}
+            dynamicFieldLabels={dynamicFieldLabels}
             lead={{
               id: lead.id,
               status: lead.status,
@@ -137,6 +148,9 @@ export default async function LeadDetailPage({
                 lead.meetingScheduledAt?.toISOString() ?? null,
               assignedToId: lead.assignedToId,
               counsellorNotes: lead.counsellorNotes,
+              dynamicField1: leadWithDynamic.dynamicField1,
+              dynamicField2: leadWithDynamic.dynamicField2,
+              dynamicField3: leadWithDynamic.dynamicField3,
             }}
             telecallers={telecallers.map((tc: TelecallerOption) => ({
               id: tc.id,

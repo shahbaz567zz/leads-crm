@@ -1,4 +1,9 @@
 import { normaliseMetaKey } from "@/lib/utils";
+import {
+  isDynamicLeadFieldKey,
+  normalizeDynamicLeadFieldLabels,
+  type DynamicLeadFieldLabels,
+} from "@/lib/lead-field-labels";
 
 export const CSV_IMPORT_FIELD_KEYS = [
   "name",
@@ -8,6 +13,9 @@ export const CSV_IMPORT_FIELD_KEYS = [
   "twelfthLocation",
   "jeeRankRange",
   "courseInterest",
+  "dynamicField1",
+  "dynamicField2",
+  "dynamicField3",
   "source",
   "campaignName",
   "priority",
@@ -26,7 +34,9 @@ export type CsvImportFieldDefinition = {
   aliases: string[];
 };
 
-export const CSV_IMPORT_FIELD_DEFINITIONS: CsvImportFieldDefinition[] = [
+export type CampaignMappingSourceValue = "META" | "GOOGLE" | "CSV";
+
+const BASE_CSV_IMPORT_FIELD_DEFINITIONS: CsvImportFieldDefinition[] = [
   {
     key: "name",
     label: "Name",
@@ -77,6 +87,21 @@ export const CSV_IMPORT_FIELD_DEFINITIONS: CsvImportFieldDefinition[] = [
     aliases: ["course_interest", "course", "program"],
   },
   {
+    key: "dynamicField1",
+    label: "Dynamic 1",
+    aliases: ["dynamic_1", "dynamic1", "extra_field_1", "custom_field_1"],
+  },
+  {
+    key: "dynamicField2",
+    label: "Dynamic 2",
+    aliases: ["dynamic_2", "dynamic2", "extra_field_2", "custom_field_2"],
+  },
+  {
+    key: "dynamicField3",
+    label: "Dynamic 3",
+    aliases: ["dynamic_3", "dynamic3", "extra_field_3", "custom_field_3"],
+  },
+  {
     key: "source",
     label: "Source",
     aliases: ["source", "lead_source"],
@@ -103,19 +128,113 @@ export const CSV_IMPORT_FIELD_DEFINITIONS: CsvImportFieldDefinition[] = [
   },
 ];
 
-export const CSV_IMPORT_REQUIRED_FIELDS = CSV_IMPORT_FIELD_DEFINITIONS.filter(
-  (field) => field.required,
-).map((field) => field.key);
+function applyDynamicLeadFieldLabel(
+  field: CsvImportFieldDefinition,
+  dynamicLeadFieldLabels: DynamicLeadFieldLabels,
+) {
+  if (!isDynamicLeadFieldKey(field.key)) {
+    return field;
+  }
+
+  return {
+    ...field,
+    label: dynamicLeadFieldLabels[field.key],
+  };
+}
+
+export function getCsvImportFieldDefinitions(
+  dynamicLeadFieldLabels?: Partial<DynamicLeadFieldLabels>,
+) {
+  const resolvedLabels = normalizeDynamicLeadFieldLabels(
+    dynamicLeadFieldLabels,
+  );
+
+  return BASE_CSV_IMPORT_FIELD_DEFINITIONS.map((field) =>
+    applyDynamicLeadFieldLabel(field, resolvedLabels),
+  );
+}
+
+export const CSV_IMPORT_FIELD_DEFINITIONS = getCsvImportFieldDefinitions();
+
+export const CSV_IMPORT_REQUIRED_FIELDS =
+  BASE_CSV_IMPORT_FIELD_DEFINITIONS.filter((field) => field.required).map(
+    (field) => field.key,
+  );
+
+export const WEBHOOK_CAMPAIGN_MAPPING_FIELD_KEYS = [
+  "name",
+  "phone",
+  "email",
+  "city",
+  "twelfthLocation",
+  "jeeRankRange",
+  "courseInterest",
+  "dynamicField1",
+  "dynamicField2",
+  "dynamicField3",
+] as const satisfies readonly CsvImportFieldKey[];
+
+export const CAMPAIGN_MAPPING_FIELD_KEYS_BY_SOURCE: Record<
+  CampaignMappingSourceValue,
+  readonly CsvImportFieldKey[]
+> = {
+  META: WEBHOOK_CAMPAIGN_MAPPING_FIELD_KEYS,
+  GOOGLE: WEBHOOK_CAMPAIGN_MAPPING_FIELD_KEYS,
+  CSV: CSV_IMPORT_FIELD_KEYS,
+};
+
+export function getCampaignMappingFieldKeys(
+  source: CampaignMappingSourceValue,
+) {
+  return CAMPAIGN_MAPPING_FIELD_KEYS_BY_SOURCE[source];
+}
+
+export function getCampaignMappingFieldDefinitions(
+  source: CampaignMappingSourceValue,
+  dynamicLeadFieldLabels?: Partial<DynamicLeadFieldLabels>,
+) {
+  const allowedKeys = new Set(getCampaignMappingFieldKeys(source));
+
+  return getCsvImportFieldDefinitions(dynamicLeadFieldLabels).filter((field) =>
+    allowedKeys.has(field.key),
+  );
+}
 
 export function getCsvFieldAliases(fieldKey: CsvImportFieldKey) {
   return (
-    CSV_IMPORT_FIELD_DEFINITIONS.find((field) => field.key === fieldKey)
+    BASE_CSV_IMPORT_FIELD_DEFINITIONS.find((field) => field.key === fieldKey)
       ?.aliases ?? []
   );
 }
 
 function normalizeHeader(value: string) {
   return normaliseMetaKey(value);
+}
+
+export function buildSuggestedCampaignMapping(
+  source: CampaignMappingSourceValue,
+  sourceFields: string[],
+) {
+  const mapping: CsvImportColumnMapping = {};
+  const allowedKeys = new Set(getCampaignMappingFieldKeys(source));
+  const normalizedFields = sourceFields.map((field) => normalizeHeader(field));
+
+  BASE_CSV_IMPORT_FIELD_DEFINITIONS.forEach((field) => {
+    if (!allowedKeys.has(field.key)) {
+      return;
+    }
+
+    const matchedIndex = field.aliases
+      .map((alias) => normalizeHeader(alias))
+      .map((alias) => normalizedFields.indexOf(alias))
+      .find((index) => index >= 0);
+
+    if (matchedIndex !== undefined && matchedIndex >= 0) {
+      mapping[field.key] = sourceFields[matchedIndex];
+    }
+  });
+
+  return mapping;
 }
 
 export function parseCsvRows(content: string) {
@@ -176,21 +295,7 @@ export function parseCsvRows(content: string) {
 }
 
 export function buildSuggestedCsvMapping(headers: string[]) {
-  const mapping: CsvImportColumnMapping = {};
-  const normalizedHeaders = headers.map((header) => normalizeHeader(header));
-
-  CSV_IMPORT_FIELD_DEFINITIONS.forEach((field) => {
-    const matchedIndex = field.aliases
-      .map((alias) => normalizeHeader(alias))
-      .map((alias) => normalizedHeaders.indexOf(alias))
-      .find((index) => index >= 0);
-
-    if (matchedIndex !== undefined && matchedIndex >= 0) {
-      mapping[field.key] = headers[matchedIndex];
-    }
-  });
-
-  return mapping;
+  return buildSuggestedCampaignMapping("CSV", headers);
 }
 
 export function buildCsvPreview(content: string, previewRows = 3) {

@@ -45,6 +45,9 @@ export type ParsedGoogleLead = {
   twelfthLocation?: string;
   jeeRankRange?: string;
   courseInterest?: string;
+  dynamicField1?: string;
+  dynamicField2?: string;
+  dynamicField3?: string;
   campaignName?: string;
   adGroupName?: string;
   formId?: string;
@@ -223,6 +226,9 @@ export async function parseGoogleLead(
       undefined,
       ["course", "course_interest", "program", "preferred_course"],
     ),
+    dynamicField1: resolveField(allColumns, answers, mapping, "dynamicField1"),
+    dynamicField2: resolveField(allColumns, answers, mapping, "dynamicField2"),
+    dynamicField3: resolveField(allColumns, answers, mapping, "dynamicField3"),
     campaignName: normalizeEmpty(payload.campaign_name),
     adGroupName: normalizeEmpty(payload.adgroup_name),
     formId: normalizeEmpty(payload.form_id),

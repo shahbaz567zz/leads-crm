@@ -93,6 +93,9 @@ model Lead {
   twelfthLocation   String?
   jeeRankRange      String?
   courseInterest    String?
+  dynamicField1     String?
+  dynamicField2     String?
+  dynamicField3     String?
   counsellorNotes   String?            @db.Text
   source            String             @default("Meta Ads")
   campaignName      String?
@@ -193,6 +196,15 @@ model AutomationSetting {
   lastEmailError     String?  @db.Text
   lastWhatsappError  String?  @db.Text
   lastSummary        String?  @db.Text
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model LeadFieldSetting {
+  id                 String   @id
+  dynamicField1Label String   @default("Dynamic 1")
+  dynamicField2Label String   @default("Dynamic 2")
+  dynamicField3Label String   @default("Dynamic 3")
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 }

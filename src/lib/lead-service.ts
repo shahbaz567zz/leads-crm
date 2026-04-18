@@ -100,6 +100,9 @@ export type LeadExportRow = {
   twelfthLocation: string;
   jeeRankRange: string;
   courseInterest: string;
+  dynamicField1: string;
+  dynamicField2: string;
+  dynamicField3: string;
   status: LeadStatusValue;
   priority: LeadPriorityValue;
   assignedTo: string;
@@ -139,6 +142,9 @@ const leadExportSelect = {
   twelfthLocation: true,
   jeeRankRange: true,
   courseInterest: true,
+  dynamicField1: true,
+  dynamicField2: true,
+  dynamicField3: true,
   status: true,
   priority: true,
   campaignName: true,
@@ -943,6 +949,9 @@ function mapLeadExportRecord(record: LeadExportRecord): LeadExportRow {
     twelfthLocation: record.twelfthLocation ?? "",
     jeeRankRange: record.jeeRankRange ?? "",
     courseInterest: record.courseInterest ?? "",
+    dynamicField1: record.dynamicField1 ?? "",
+    dynamicField2: record.dynamicField2 ?? "",
+    dynamicField3: record.dynamicField3 ?? "",
     status: record.status,
     priority: record.priority,
     assignedTo: record.assignedTo?.name ?? "",
@@ -1223,6 +1232,9 @@ export async function createLead(input: CreateLeadInput, actor: SessionUser) {
       twelfthLocation: input.twelfthLocation,
       jeeRankRange: input.jeeRankRange,
       courseInterest: input.courseInterest,
+      dynamicField1: input.dynamicField1,
+      dynamicField2: input.dynamicField2,
+      dynamicField3: input.dynamicField3,
       source: input.source ?? "Manual Entry",
       campaignName: input.campaignName,
       priority,
@@ -1297,6 +1309,9 @@ export async function updateLead(
       assignedToId: true,
       meetingScheduledAt: true,
       counsellorNotes: true,
+      dynamicField1: true,
+      dynamicField2: true,
+      dynamicField3: true,
     },
   });
 
@@ -1341,6 +1356,9 @@ export async function updateLead(
         nextFollowUpAt,
         meetingScheduledAt,
         counsellorNotes: input.counsellorNotes,
+        dynamicField1: input.dynamicField1,
+        dynamicField2: input.dynamicField2,
+        dynamicField3: input.dynamicField3,
         lastContactedAt: isContactedStatus(nextStatus) ? new Date() : undefined,
       },
     });
@@ -1399,6 +1417,27 @@ export async function updateLead(
       input.counsellorNotes !== existingLead.counsellorNotes
     ) {
       notes.push("Counsellor notes updated.");
+    }
+
+    if (
+      input.dynamicField1 !== undefined &&
+      input.dynamicField1 !== existingLead.dynamicField1
+    ) {
+      notes.push("Dynamic 1 updated.");
+    }
+
+    if (
+      input.dynamicField2 !== undefined &&
+      input.dynamicField2 !== existingLead.dynamicField2
+    ) {
+      notes.push("Dynamic 2 updated.");
+    }
+
+    if (
+      input.dynamicField3 !== undefined &&
+      input.dynamicField3 !== existingLead.dynamicField3
+    ) {
+      notes.push("Dynamic 3 updated.");
     }
 
     if (notes.length) {
@@ -1569,6 +1608,12 @@ export async function ingestMetaWebhook(payload: unknown) {
       let assigneeName: string | null = existingLead?.assignedTo?.name ?? null;
 
       if (existingLead) {
+        const existingLeadWithDynamic = existingLead as typeof existingLead & {
+          dynamicField1?: string | null;
+          dynamicField2?: string | null;
+          dynamicField3?: string | null;
+        };
+
         const refreshedLead = await prisma.lead.update({
           where: { id: existingLead.id },
           data: {
@@ -1585,6 +1630,12 @@ export async function ingestMetaWebhook(payload: unknown) {
             jeeRankRange: existingLead.jeeRankRange ?? parsedLead.jeeRankRange,
             courseInterest:
               existingLead.courseInterest ?? parsedLead.courseInterest,
+            dynamicField1:
+              existingLeadWithDynamic.dynamicField1 ?? parsedLead.dynamicField1,
+            dynamicField2:
+              existingLeadWithDynamic.dynamicField2 ?? parsedLead.dynamicField2,
+            dynamicField3:
+              existingLeadWithDynamic.dynamicField3 ?? parsedLead.dynamicField3,
             campaignName: parsedLead.campaignName ?? existingLead.campaignName,
             adsetName: parsedLead.adsetName ?? existingLead.adsetName,
             adName: parsedLead.adName ?? existingLead.adName,
@@ -1636,6 +1687,9 @@ export async function ingestMetaWebhook(payload: unknown) {
             twelfthLocation: parsedLead.twelfthLocation,
             jeeRankRange: parsedLead.jeeRankRange,
             courseInterest: parsedLead.courseInterest,
+            dynamicField1: parsedLead.dynamicField1,
+            dynamicField2: parsedLead.dynamicField2,
+            dynamicField3: parsedLead.dynamicField3,
             source: "Meta Ads",
             campaignName: parsedLead.campaignName,
             adsetName: parsedLead.adsetName,
@@ -1743,6 +1797,12 @@ export async function ingestGoogleWebhook(
   let assigneeName: string | null = existingLead?.assignedTo?.name ?? null;
 
   if (existingLead) {
+    const existingLeadWithDynamic = existingLead as typeof existingLead & {
+      dynamicField1?: string | null;
+      dynamicField2?: string | null;
+      dynamicField3?: string | null;
+    };
+
     const refreshedLead = await prisma.lead.update({
       where: { id: existingLead.id },
       data: {
@@ -1756,6 +1816,12 @@ export async function ingestGoogleWebhook(
         twelfthLocation: existingLead.twelfthLocation ?? parsed.twelfthLocation,
         jeeRankRange: existingLead.jeeRankRange ?? parsed.jeeRankRange,
         courseInterest: existingLead.courseInterest ?? parsed.courseInterest,
+        dynamicField1:
+          existingLeadWithDynamic.dynamicField1 ?? parsed.dynamicField1,
+        dynamicField2:
+          existingLeadWithDynamic.dynamicField2 ?? parsed.dynamicField2,
+        dynamicField3:
+          existingLeadWithDynamic.dynamicField3 ?? parsed.dynamicField3,
         campaignName: parsed.campaignName ?? existingLead.campaignName,
         formId: parsed.formId ?? existingLead.formId,
         rawPayload: parsed.rawPayload as Prisma.InputJsonValue,
@@ -1800,6 +1866,9 @@ export async function ingestGoogleWebhook(
         twelfthLocation: parsed.twelfthLocation,
         jeeRankRange: parsed.jeeRankRange,
         courseInterest: parsed.courseInterest,
+        dynamicField1: parsed.dynamicField1,
+        dynamicField2: parsed.dynamicField2,
+        dynamicField3: parsed.dynamicField3,
         source: "Google Ads",
         campaignName: parsed.campaignName,
         formId: parsed.formId,

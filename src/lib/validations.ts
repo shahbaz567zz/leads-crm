@@ -52,6 +52,9 @@ export const createLeadSchema = z.object({
   twelfthLocation: optionalText(120),
   jeeRankRange: optionalText(120),
   courseInterest: optionalText(120),
+  dynamicField1: optionalText(240),
+  dynamicField2: optionalText(240),
+  dynamicField3: optionalText(240),
   source: optionalText(120),
   campaignName: optionalText(140),
   priority: z.enum(LEAD_PRIORITIES).optional(),
@@ -65,6 +68,9 @@ export const updateLeadSchema = z.object({
   meetingScheduledAt: optionalText(40),
   assignedToId: optionalText(40),
   counsellorNotes: optionalText(4000),
+  dynamicField1: optionalText(240),
+  dynamicField2: optionalText(240),
+  dynamicField3: optionalText(240),
 });
 
 export const createActivitySchema = z.object({

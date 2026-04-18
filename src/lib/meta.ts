@@ -39,6 +39,9 @@ export type ParsedMetaLead = {
   twelfthLocation?: string;
   jeeRankRange?: string;
   courseInterest?: string;
+  dynamicField1?: string;
+  dynamicField2?: string;
+  dynamicField3?: string;
   campaignName?: string;
   adsetName?: string;
   adName?: string;
@@ -205,6 +208,18 @@ export async function parseMetaLead(
         mapping,
         "courseInterest",
       ),
+    ),
+    dynamicField1: extractValue(
+      fields,
+      buildAliases([], mapping, "dynamicField1"),
+    ),
+    dynamicField2: extractValue(
+      fields,
+      buildAliases([], mapping, "dynamicField2"),
+    ),
+    dynamicField3: extractValue(
+      fields,
+      buildAliases([], mapping, "dynamicField3"),
     ),
     campaignName: normalizeEmpty(changeValue.campaign_name),
     adsetName: normalizeEmpty(changeValue.adset_name),

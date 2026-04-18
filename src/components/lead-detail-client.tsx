@@ -13,6 +13,7 @@ import {
   type LeadPriorityValue,
   type LeadStatusValue,
 } from "@/lib/crm-constants";
+import type { DynamicLeadFieldLabels } from "@/lib/lead-field-labels";
 import { toDateTimeLocal } from "@/lib/utils";
 
 type TelecallerOption = {
@@ -23,6 +24,7 @@ type TelecallerOption = {
 
 type LeadEditorProps = {
   canReassign: boolean;
+  dynamicFieldLabels: DynamicLeadFieldLabels;
   lead: {
     id: string;
     status: LeadStatusValue;
@@ -31,12 +33,16 @@ type LeadEditorProps = {
     meetingScheduledAt?: string | null;
     assignedToId?: string | null;
     counsellorNotes?: string | null;
+    dynamicField1?: string | null;
+    dynamicField2?: string | null;
+    dynamicField3?: string | null;
   };
   telecallers: TelecallerOption[];
 };
 
 export function LeadDetailClient({
   canReassign,
+  dynamicFieldLabels,
   lead,
   telecallers,
 }: LeadEditorProps) {
@@ -52,6 +58,9 @@ export function LeadDetailClient({
     meetingScheduledAt: toDateTimeLocal(lead.meetingScheduledAt),
     assignedToId: lead.assignedToId ?? "",
     counsellorNotes: lead.counsellorNotes ?? "",
+    dynamicField1: lead.dynamicField1 ?? "",
+    dynamicField2: lead.dynamicField2 ?? "",
+    dynamicField3: lead.dynamicField3 ?? "",
   });
   const [activityState, setActivityState] = useState({
     type: "CALL",
@@ -224,6 +233,57 @@ export function LeadDetailClient({
                   }))
                 }
                 placeholder="Objections, parent concerns, budget notes..."
+              />
+            </div>
+
+            <div>
+              <label className="field-label" htmlFor="lead-dynamic-1">
+                {dynamicFieldLabels.dynamicField1}
+              </label>
+              <input
+                id="lead-dynamic-1"
+                value={leadState.dynamicField1}
+                onChange={(event) =>
+                  setLeadState((current) => ({
+                    ...current,
+                    dynamicField1: event.target.value,
+                  }))
+                }
+                placeholder="Additional form field value"
+              />
+            </div>
+
+            <div>
+              <label className="field-label" htmlFor="lead-dynamic-2">
+                {dynamicFieldLabels.dynamicField2}
+              </label>
+              <input
+                id="lead-dynamic-2"
+                value={leadState.dynamicField2}
+                onChange={(event) =>
+                  setLeadState((current) => ({
+                    ...current,
+                    dynamicField2: event.target.value,
+                  }))
+                }
+                placeholder="Additional form field value"
+              />
+            </div>
+
+            <div>
+              <label className="field-label" htmlFor="lead-dynamic-3">
+                {dynamicFieldLabels.dynamicField3}
+              </label>
+              <input
+                id="lead-dynamic-3"
+                value={leadState.dynamicField3}
+                onChange={(event) =>
+                  setLeadState((current) => ({
+                    ...current,
+                    dynamicField3: event.target.value,
+                  }))
+                }
+                placeholder="Additional form field value"
               />
             </div>
           </div>
@@ -418,9 +478,7 @@ export function LeadDetailClient({
             ) : null}
           </div>
 
-          {error ? (
-            <div className="alert-error">{error}</div>
-          ) : null}
+          {error ? <div className="alert-error">{error}</div> : null}
         </div>
       </section>
     </div>
