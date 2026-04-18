@@ -124,6 +124,20 @@ export function Sidebar({ user, managerMode }: SidebarProps) {
             <p className="mb-2 mt-6 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
               Settings
             </p>
+            {user.role === "ADMIN" && (
+              <Link
+                href="/settings/users"
+                onClick={() => setMobileOpen(false)}
+                className={
+                  pathname === "/settings/users"
+                    ? "nav-link-active"
+                    : "nav-link"
+                }
+              >
+                <Users className="h-4 w-4 shrink-0" />
+                Users & Telecallers
+              </Link>
+            )}
             <Link
               href="/settings/campaign-mappings"
               onClick={() => setMobileOpen(false)}

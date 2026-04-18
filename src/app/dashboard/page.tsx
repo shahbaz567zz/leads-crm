@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { AddLeadModal } from "@/components/add-lead-modal";
+import { DashboardAutoAssignCard } from "@/components/dashboard-auto-assign-card";
 import { LeadQueueFilters } from "@/components/lead-queue-filters";
 import { CsvImportCard } from "@/components/csv-import-card";
 import { DataTable } from "@/components/data-table";
@@ -11,7 +12,11 @@ import {
   type LeadPriorityValue,
   type LeadStatusValue,
 } from "@/lib/crm-constants";
-import { getDashboardData, type TelecallerOption } from "@/lib/lead-service";
+import {
+  getAutoAssignEnabled,
+  getDashboardData,
+  type TelecallerOption,
+} from "@/lib/lead-service";
 
 function readSingle(value?: string | string[]) {
   return Array.isArray(value) ? value[0] : value;
@@ -91,10 +96,11 @@ export default async function DashboardPage({
     return params.size ? `/dashboard?${params.toString()}` : "/dashboard";
   }
 
-  const { leads, stats, telecallers, reporting } = await getDashboardData(
-    user,
-    filters,
-  );
+  const [{ leads, stats, telecallers, reporting }, autoAssignEnabled] =
+    await Promise.all([
+      getDashboardData(user, filters),
+      user.role === "ADMIN" ? getAutoAssignEnabled() : Promise.resolve(false),
+    ]);
   const managerMode = canManageAssignments(user);
   const adminMode = user.role === "ADMIN";
 
@@ -296,6 +302,9 @@ export default async function DashboardPage({
             {/* Sidebar auxiliary tools */}
             {managerMode ? (
               <div className="space-y-6">
+                {adminMode ? (
+                  <DashboardAutoAssignCard initialEnabled={autoAssignEnabled} />
+                ) : null}
                 <CsvImportCard templateHref="/lead-import-template.csv" />
               </div>
             ) : null}

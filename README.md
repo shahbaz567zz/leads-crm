@@ -121,6 +121,7 @@ Change the seed password immediately after first login by updating the user in P
 ## SLA notification automation
 
 - Manager and admin users can enable or disable email and WhatsApp SLA notifications from the dashboard
+- Admin users can also enable or disable automatic lead assignment from the dashboard
 - The automation scheduler runs inside the Next.js server process, so it requires the app to stay running under PM2, `npm start`, or a similar persistent process
 - The scheduler checks for breaches every `SLA_NOTIFICATION_CHECK_INTERVAL_MINUTES`
 - Repeat notifications are throttled by `SLA_NOTIFICATION_MIN_REPEAT_MINUTES`

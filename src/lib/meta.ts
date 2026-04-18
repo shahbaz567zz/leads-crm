@@ -79,7 +79,7 @@ function extractValue(fields: MetaField[] | undefined, aliases: string[]) {
 
 export async function fetchMetaLeadDetails(leadId: string) {
   const accessToken = process.env.META_ACCESS_TOKEN;
-  const graphVersion = process.env.META_GRAPH_VERSION ?? "v22.0";
+  const graphVersion = process.env.META_GRAPH_VERSION ?? "v25.0";
 
   if (!accessToken) {
     throw new Error("META_ACCESS_TOKEN is missing.");

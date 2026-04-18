@@ -4,6 +4,7 @@ import {
   ACTIVITY_TYPES,
   LEAD_PRIORITIES,
   LEAD_STATUSES,
+  USER_ROLES,
 } from "@/lib/crm-constants";
 
 const optionalText = (maxLength = 160) =>
@@ -22,6 +23,17 @@ const optionalText = (maxLength = 160) =>
       const trimmed = value.trim();
       return trimmed.length ? trimmed : undefined;
     });
+
+const optionalPassword = z
+  .union([z.string().min(8).max(120), z.literal(""), z.null(), z.undefined()])
+  .transform((value) => {
+    if (typeof value !== "string") {
+      return undefined;
+    }
+
+    const trimmed = value.trim();
+    return trimmed.length ? trimmed : undefined;
+  });
 
 export const loginSchema = z.object({
   email: z
@@ -130,6 +142,40 @@ export const campaignMappingSchema = z.object({
   columnMapping: z.record(z.string(), z.string().trim().min(1).max(200)),
 });
 
+export const createPortalUserSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  email: z
+    .string()
+    .trim()
+    .email()
+    .transform((value) => value.toLowerCase()),
+  phone: optionalText(40),
+  role: z.enum(USER_ROLES),
+  isActive: z.boolean().optional().default(true),
+  isPriorityAgent: z.boolean().optional().default(false),
+  password: z.string().trim().min(8).max(120),
+});
+
+export const updatePortalUserSchema = z.object({
+  name: z.string().trim().min(2).max(120).optional(),
+  email: z
+    .string()
+    .trim()
+    .email()
+    .transform((value) => value.toLowerCase())
+    .optional(),
+  phone: optionalText(40),
+  role: z.enum(USER_ROLES).optional(),
+  isActive: z.boolean().optional(),
+  isPriorityAgent: z.boolean().optional(),
+  password: optionalPassword,
+});
+
+export const reassignManagedUserLeadsSchema = z.object({
+  targetTelecallerId: z.string().trim().min(1),
+  deleteSourceUser: z.boolean().optional().default(false),
+});
+
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateLeadInput = z.infer<typeof createLeadSchema>;
 export type UpdateLeadInput = z.infer<typeof updateLeadSchema>;
@@ -142,3 +188,8 @@ export type CsvImportColumnMappingInput = z.infer<
 >;
 export type CampaignMappingInput = z.infer<typeof campaignMappingSchema>;
 export type FilteredCountInput = z.infer<typeof filteredCountSchema>;
+export type CreatePortalUserInput = z.infer<typeof createPortalUserSchema>;
+export type UpdatePortalUserInput = z.infer<typeof updatePortalUserSchema>;
+export type ReassignManagedUserLeadsInput = z.infer<
+  typeof reassignManagedUserLeadsSchema
+>;

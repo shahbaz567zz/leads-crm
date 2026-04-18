@@ -5,7 +5,6 @@ import { canManageAssignments, type SessionUser } from "@/lib/auth";
 import {
   CLOSED_LEAD_STATUSES,
   LEAD_STATUS_LABELS,
-  PRIORITY_WEIGHT,
   STATUS_FLOW,
   type LeadPriorityValue,
   type LeadStatusValue,
@@ -898,18 +897,8 @@ export async function getDashboardData(
     converted,
   );
 
-  const sortedLeads = [...leads].sort((left, right) => {
-    const priorityComparison =
-      PRIORITY_WEIGHT[left.priority] - PRIORITY_WEIGHT[right.priority];
-    if (priorityComparison !== 0) {
-      return priorityComparison;
-    }
-
-    return right.createdAt.getTime() - left.createdAt.getTime();
-  });
-
   return {
-    leads: sortedLeads,
+    leads,
     telecallers,
     reporting,
     stats: {
