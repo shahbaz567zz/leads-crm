@@ -672,7 +672,7 @@ export const DataTable = forwardRef<DataTableHandle, DataTableProps>(
             const value = row.original.dynamicField1;
 
             return (
-              <span className="text-sm text-slate-600 dark:text-slate-300">
+              <span className="text-xs text-slate-600 dark:text-slate-300">
                 {value || "-"}
               </span>
             );
