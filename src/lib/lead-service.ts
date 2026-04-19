@@ -1,5 +1,5 @@
 import { addDays, endOfDay, startOfDay } from "date-fns";
-import { type Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 import { canManageAssignments, type SessionUser } from "@/lib/auth";
 import {

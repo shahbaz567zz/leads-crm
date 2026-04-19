@@ -45,6 +45,7 @@ import { normalizeIndianPhone } from "@/lib/utils";
 
 type LeadRow = {
   id: string;
+  leadNumber?: number | null;
   name: string;
   phone: string;
   email?: string | null;
@@ -106,6 +107,7 @@ type ColumnPreferenceOption = {
 const COLUMN_VISIBILITY_COOKIE = "lead-table-columns";
 
 const COLUMN_PREFERENCE_OPTIONS: ColumnPreferenceOption[] = [
+  { id: "leadNumber", label: "Lead No.", defaultVisible: true },
   { id: "name", label: "Lead Info", defaultVisible: true, alwaysVisible: true },
   { id: "email", label: "Email", defaultVisible: false },
   { id: "status", label: "Status", defaultVisible: true },
@@ -514,6 +516,19 @@ export const DataTable = forwardRef<DataTableHandle, DataTableProps>(
               } satisfies ColumnDef<LeadRow>,
             ]
           : []),
+        {
+          accessorKey: "leadNumber",
+          header: "Lead No.",
+          cell: ({ row }) => {
+            const leadNumber = row.original.leadNumber;
+
+            return (
+              <span className="font-mono text-xs text-slate-500 dark:text-slate-300">
+                {leadNumber ?? "-"}
+              </span>
+            );
+          },
+        },
         {
           accessorKey: "name",
           header: "Lead Info",

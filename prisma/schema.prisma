@@ -82,6 +82,7 @@ model User {
 
 model Lead {
   id                String             @id @default(cuid())
+  leadNumber        Int                @unique @default(autoincrement())
   metaLeadId        String?            @unique
   googleLeadId      String?            @unique
   googleClickId     String?
