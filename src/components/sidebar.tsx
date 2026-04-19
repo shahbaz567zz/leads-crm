@@ -17,8 +17,13 @@ import {
   ChevronsRight,
   Moon,
   Sun,
+  KeyRound,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import toast from "react-hot-toast";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type SidebarProps = {
   user: {
@@ -49,6 +54,7 @@ export function Sidebar({
   const [collapsed, setCollapsed] = useState(initialCollapsed);
   const [darkMode, setDarkMode] = useState(false);
   const [themeReady, setThemeReady] = useState(false);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
 
   useEffect(() => {
     const storedTheme = localStorage.getItem("theme");
@@ -249,6 +255,15 @@ export function Sidebar({
         </div>
         <button
           type="button"
+          className={`button-ghost mb-2 w-full ${collapsed ? "justify-center" : "justify-start gap-2"} text-slate-500 dark:text-slate-400`}
+          onClick={() => setPasswordModalOpen(true)}
+          title={collapsed ? "Change password" : undefined}
+        >
+          <KeyRound className="h-4 w-4" />
+          {!collapsed && "Change Password"}
+        </button>
+        <button
+          type="button"
           className={`button-ghost w-full ${collapsed ? "justify-center" : "justify-start gap-2"} text-slate-500 dark:text-slate-400`}
           onClick={handleLogout}
           title={collapsed ? "Sign out" : undefined}
@@ -320,6 +335,152 @@ export function Sidebar({
       >
         {sidebarContent(false)}
       </aside>
+
+      {passwordModalOpen ? (
+        <ChangePasswordModal onClose={() => setPasswordModalOpen(false)} />
+      ) : null}
     </>
+  );
+}
+
+function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+  const [form, setForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [error, setError] = useState<string | null>(null);
+  const [saving, startSaving] = useTransition();
+
+  function setField(
+    key: "currentPassword" | "newPassword" | "confirmPassword",
+    value: string,
+  ) {
+    setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function handleSubmit() {
+    if (
+      form.currentPassword.trim().length < 8 ||
+      form.newPassword.trim().length < 8
+    ) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+
+    if (form.newPassword !== form.confirmPassword) {
+      setError("New password and confirmation do not match.");
+      return;
+    }
+
+    setError(null);
+
+    startSaving(async () => {
+      try {
+        const response = await fetch("/api/auth/change-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            currentPassword: form.currentPassword,
+            newPassword: form.newPassword,
+          }),
+        });
+        const body = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(body.error ?? "Unable to change password.");
+        }
+
+        toast.success("Password updated.");
+        onClose();
+      } catch (submitError) {
+        setError(
+          submitError instanceof Error
+            ? submitError.message
+            : "Unable to change password.",
+        );
+      }
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-xl dark:bg-slate-900">
+        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              Change Password
+            </h3>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Update your login password for this CRM account.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="rounded-full p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+            onClick={onClose}
+          >
+            <span className="sr-only">Close</span>x
+          </button>
+        </div>
+
+        <div className="space-y-4 px-5 py-5">
+          <label className="space-y-1.5">
+            <span className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+              Current Password
+            </span>
+            <Input
+              type="password"
+              value={form.currentPassword}
+              onChange={(event) =>
+                setField("currentPassword", event.target.value)
+              }
+              placeholder="Enter current password"
+            />
+          </label>
+
+          <label className="space-y-1.5">
+            <span className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+              New Password
+            </span>
+            <Input
+              type="password"
+              value={form.newPassword}
+              onChange={(event) => setField("newPassword", event.target.value)}
+              placeholder="Use at least 8 characters"
+            />
+          </label>
+
+          <label className="space-y-1.5">
+            <span className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+              Confirm New Password
+            </span>
+            <Input
+              type="password"
+              value={form.confirmPassword}
+              onChange={(event) =>
+                setField("confirmPassword", event.target.value)
+              }
+              placeholder="Re-enter new password"
+            />
+          </label>
+
+          {error ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
+              {error}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="flex justify-end gap-3 border-t border-slate-100 px-5 py-4 dark:border-slate-800">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="button" onClick={handleSubmit} disabled={saving}>
+            {saving ? "Saving..." : "Update Password"}
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }

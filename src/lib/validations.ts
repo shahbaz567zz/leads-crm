@@ -44,6 +44,11 @@ export const loginSchema = z.object({
   password: z.string().min(8).max(120),
 });
 
+export const changeOwnPasswordSchema = z.object({
+  currentPassword: z.string().trim().min(8).max(120),
+  newPassword: z.string().trim().min(8).max(120),
+});
+
 export const createLeadSchema = z.object({
   name: z.string().trim().min(2).max(100),
   phone: z.string().trim().min(10).max(20),
@@ -199,3 +204,4 @@ export type UpdatePortalUserInput = z.infer<typeof updatePortalUserSchema>;
 export type ReassignManagedUserLeadsInput = z.infer<
   typeof reassignManagedUserLeadsSchema
 >;
+export type ChangeOwnPasswordInput = z.infer<typeof changeOwnPasswordSchema>;

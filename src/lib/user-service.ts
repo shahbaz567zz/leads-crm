@@ -1,9 +1,10 @@
-import { hash } from "bcryptjs";
+import { compare, hash } from "bcryptjs";
 import type { Prisma } from "@prisma/client";
 
 import type { SessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import type {
+  ChangeOwnPasswordInput,
   CreatePortalUserInput,
   ReassignManagedUserLeadsInput,
   UpdatePortalUserInput,
@@ -231,6 +232,46 @@ export async function updateManagedUser(
       data: updateData,
       select: managedUserSelect,
     });
+  });
+}
+
+export async function changeOwnPassword(
+  input: ChangeOwnPasswordInput,
+  actor: SessionUser,
+) {
+  const existingUser = await prisma.user.findUnique({
+    where: { id: actor.id },
+    select: {
+      id: true,
+      passwordHash: true,
+      isActive: true,
+    },
+  });
+
+  if (!existingUser || !existingUser.isActive) {
+    throw new Error("User not found.");
+  }
+
+  const currentPasswordMatches = await compare(
+    input.currentPassword,
+    existingUser.passwordHash,
+  );
+
+  if (!currentPasswordMatches) {
+    throw new Error("Current password is incorrect.");
+  }
+
+  if (input.currentPassword === input.newPassword) {
+    throw new Error(
+      "New password must be different from the current password.",
+    );
+  }
+
+  await prisma.user.update({
+    where: { id: actor.id },
+    data: {
+      passwordHash: await hash(input.newPassword, 12),
+    },
   });
 }
 

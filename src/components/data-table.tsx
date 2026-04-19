@@ -1175,15 +1175,22 @@ export const DataTable = forwardRef<DataTableHandle, DataTableProps>(
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
               {table.getRowModel().rows.map((row) => {
                 const isUnassigned = !row.original.assignedTo;
+                const isAssignedForTelecaller =
+                  !managerMode &&
+                  !adminMode &&
+                  row.original.status === "ASSIGNED";
+
                 return (
                   <tr
                     key={row.id}
                     className={
                       row.getIsSelected()
                         ? "bg-indigo-50/60 dark:bg-indigo-900/30"
-                        : isUnassigned
-                          ? "bg-amber-100/60 border-l-2 border-l-amber-400 dark:bg-amber-900/20 dark:border-l-amber-500"
-                          : ""
+                        : isAssignedForTelecaller
+                          ? "bg-sky-50/80 border-l-2 border-l-sky-500 dark:bg-sky-950/30 dark:border-l-sky-400"
+                          : isUnassigned
+                            ? "bg-amber-100/60 border-l-2 border-l-amber-400 dark:bg-amber-900/20 dark:border-l-amber-500"
+                            : ""
                     }
                   >
                     {row.getVisibleCells().map((cell) => (
