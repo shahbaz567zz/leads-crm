@@ -737,11 +737,13 @@ export const DataTable = forwardRef<DataTableHandle, DataTableProps>(
           header: "Created",
           cell: ({ row }) => {
             const lead = row.original;
+
             if (!lead.createdAt)
               return <span className="text-sm text-slate-400">-</span>;
+
             return (
               <span className="whitespace-nowrap text-xs text-slate-500">
-                {format(new Date(lead.createdAt), "dd MMM yyyy")}
+                {format(new Date(lead.createdAt), "dd MMM yyyy, hh:mm a")}
               </span>
             );
           },
