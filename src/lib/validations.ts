@@ -35,6 +35,27 @@ const optionalPassword = z
     return trimmed.length ? trimmed : undefined;
   });
 
+const optionalNullableText = (maxLength = 160) =>
+  z
+    .union([
+      z.string().trim().max(maxLength),
+      z.literal(""),
+      z.null(),
+      z.undefined(),
+    ])
+    .transform((value) => {
+      if (value === null) {
+        return null;
+      }
+
+      if (typeof value !== "string") {
+        return undefined;
+      }
+
+      const trimmed = value.trim();
+      return trimmed.length ? trimmed : undefined;
+    });
+
 export const loginSchema = z.object({
   email: z
     .string()
@@ -71,7 +92,7 @@ export const updateLeadSchema = z.object({
   priority: z.enum(LEAD_PRIORITIES).optional(),
   nextFollowUpAt: optionalText(40),
   meetingScheduledAt: optionalText(40),
-  assignedToId: optionalText(40),
+  assignedToId: optionalNullableText(40),
   counsellorNotes: optionalText(4000),
   dynamicField1: optionalText(240),
   dynamicField2: optionalText(240),

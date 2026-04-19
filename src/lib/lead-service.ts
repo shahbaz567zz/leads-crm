@@ -1321,19 +1321,24 @@ export async function updateLead(
 
   assertLeadAccess(actor, existingLead.assignedToId);
 
-  if (input.assignedToId && !canManageAssignments(actor)) {
+  if (input.assignedToId !== undefined && !canManageAssignments(actor)) {
     throw new Error("Only managers can reassign leads.");
   }
 
-  if (input.assignedToId && input.assignedToId !== existingLead.assignedToId) {
+  const assignmentChanged =
+    input.assignedToId !== undefined &&
+    input.assignedToId !== existingLead.assignedToId;
+
+  if (
+    assignmentChanged &&
+    typeof input.assignedToId === "string" &&
+    input.assignedToId
+  ) {
     await assignLeadManually(leadId, input.assignedToId, actor);
   }
 
   const nextFollowUpAt = parseOptionalDate(input.nextFollowUpAt);
   const meetingScheduledAt = parseOptionalDate(input.meetingScheduledAt);
-  const assignmentChanged = Boolean(
-    input.assignedToId && input.assignedToId !== existingLead.assignedToId,
-  );
   const nextStatus =
     input.status ??
     (assignmentChanged && existingLead.status === "NEW"
@@ -1351,6 +1356,9 @@ export async function updateLead(
     const lead = await tx.lead.update({
       where: { id: leadId },
       data: {
+        ...(assignmentChanged && input.assignedToId === null
+          ? { assignedToId: null }
+          : {}),
         status: nextStatus,
         priority: nextPriority,
         nextFollowUpAt,
@@ -1400,6 +1408,14 @@ export async function updateLead(
 
     if (priorityChanged && input.priority) {
       notes.push(`Priority set to ${input.priority.toLowerCase()}.`);
+    }
+
+    if (assignmentChanged) {
+      notes.push(
+        input.assignedToId === null
+          ? "Lead moved back to Unassigned."
+          : "Lead reassigned.",
+      );
     }
 
     if (nextFollowUpAt) {
