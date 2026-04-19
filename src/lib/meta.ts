@@ -124,16 +124,18 @@ export async function parseMetaLead(
   const fields = metaLead.field_data;
 
   // Try to load a saved campaign mapping for this form / campaign
+  let savedMapping: Awaited<ReturnType<typeof findCampaignMapping>> | null =
+    null;
   let mapping: CsvImportColumnMapping | undefined;
 
   try {
-    const saved = await findCampaignMapping("META", {
+    savedMapping = await findCampaignMapping("META", {
       formId: changeValue.form_id,
       campaignName: changeValue.campaign_name,
     });
 
-    if (saved) {
-      mapping = saved.columnMapping;
+    if (savedMapping) {
+      mapping = savedMapping.columnMapping;
     }
   } catch {
     // Non-fatal — fall through to default aliases
@@ -221,10 +223,14 @@ export async function parseMetaLead(
       fields,
       buildAliases([], mapping, "dynamicField3"),
     ),
-    campaignName: normalizeEmpty(changeValue.campaign_name),
+    campaignName:
+      normalizeEmpty(changeValue.campaign_name) ??
+      normalizeEmpty(savedMapping?.campaignName),
     adsetName: normalizeEmpty(changeValue.adset_name),
     adName: normalizeEmpty(changeValue.ad_name),
-    formId: normalizeEmpty(changeValue.form_id),
+    formId:
+      normalizeEmpty(changeValue.form_id) ??
+      normalizeEmpty(savedMapping?.formId),
     pageId: normalizeEmpty(changeValue.page_id),
     priority: inferLeadPriority(extractValue(fields, jeeAliases)),
     rawPayload: {

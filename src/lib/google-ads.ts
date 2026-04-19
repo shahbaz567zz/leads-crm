@@ -144,16 +144,18 @@ export async function parseGoogleLead(
   const answers = payload.custom_question_answers;
 
   // Try to load a saved campaign mapping
+  let savedMapping: Awaited<ReturnType<typeof findCampaignMapping>> | null =
+    null;
   let mapping: CsvImportColumnMapping | undefined;
 
   try {
-    const saved = await findCampaignMapping("GOOGLE", {
+    savedMapping = await findCampaignMapping("GOOGLE", {
       formId: payload.form_id,
       campaignName: payload.campaign_name,
     });
 
-    if (saved) {
-      mapping = saved.columnMapping;
+    if (savedMapping) {
+      mapping = savedMapping.columnMapping;
     }
   } catch {
     // Non-fatal
@@ -229,9 +231,12 @@ export async function parseGoogleLead(
     dynamicField1: resolveField(allColumns, answers, mapping, "dynamicField1"),
     dynamicField2: resolveField(allColumns, answers, mapping, "dynamicField2"),
     dynamicField3: resolveField(allColumns, answers, mapping, "dynamicField3"),
-    campaignName: normalizeEmpty(payload.campaign_name),
+    campaignName:
+      normalizeEmpty(payload.campaign_name) ??
+      normalizeEmpty(savedMapping?.campaignName),
     adGroupName: normalizeEmpty(payload.adgroup_name),
-    formId: normalizeEmpty(payload.form_id),
+    formId:
+      normalizeEmpty(payload.form_id) ?? normalizeEmpty(savedMapping?.formId),
     priority: inferLeadPriority(jeeRankRange),
     rawPayload: {
       google: payload,
