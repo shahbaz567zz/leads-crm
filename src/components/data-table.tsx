@@ -15,7 +15,6 @@ import {
   type VisibilityState,
   flexRender,
   getCoreRowModel,
-  getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
 import { format } from "date-fns";
@@ -79,6 +78,10 @@ export interface DataTableProps {
     hasNextPage: boolean;
     hasPreviousPage: boolean;
   };
+  sorting?: {
+    sortBy: string;
+    sortDirection: "asc" | "desc";
+  } | null;
   telecallers: { id: string; name: string }[];
   managerMode: boolean;
   adminMode: boolean;
@@ -245,6 +248,7 @@ export const DataTable = forwardRef<DataTableHandle, DataTableProps>(
     {
       data: initialData,
       pagination,
+      sorting: activeSorting,
       telecallers,
       managerMode,
       adminMode,
@@ -266,7 +270,6 @@ export const DataTable = forwardRef<DataTableHandle, DataTableProps>(
       [resolvedDynamicFieldLabels],
     );
     const [data, setData] = useState<LeadRow[]>(initialData);
-    const [sorting, setSorting] = useState<SortingState>([]);
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
       () =>
@@ -482,6 +485,19 @@ export const DataTable = forwardRef<DataTableHandle, DataTableProps>(
       [currentFilters],
     );
 
+    const sortingState = useMemo<SortingState>(
+      () =>
+        activeSorting
+          ? [
+              {
+                id: activeSorting.sortBy,
+                desc: activeSorting.sortDirection === "desc",
+              },
+            ]
+          : [],
+      [activeSorting],
+    );
+
     const updatePagination = useCallback(
       (nextPage: number, nextPageSize = pagination.pageSize) => {
         const params = new URLSearchParams(Array.from(searchParams.entries()));
@@ -513,6 +529,36 @@ export const DataTable = forwardRef<DataTableHandle, DataTableProps>(
         router,
         searchParams,
       ],
+    );
+
+    const updateSorting = useCallback(
+      (
+        updaterOrValue:
+          | SortingState
+          | ((currentState: SortingState) => SortingState),
+      ) => {
+        const params = new URLSearchParams(Array.from(searchParams.entries()));
+        const nextSorting =
+          typeof updaterOrValue === "function"
+            ? updaterOrValue(sortingState)
+            : updaterOrValue;
+        const nextSort = nextSorting[0];
+
+        params.delete("page");
+
+        if (!nextSort) {
+          params.delete("sortBy");
+          params.delete("sortDirection");
+        } else {
+          params.set("sortBy", nextSort.id);
+          params.set("sortDirection", nextSort.desc ? "desc" : "asc");
+        }
+
+        router.push(
+          params.size ? `${pathname}?${params.toString()}` : pathname,
+        );
+      },
+      [pathname, router, searchParams, sortingState],
     );
 
     const columns = useMemo<ColumnDef<LeadRow>[]>(
@@ -952,7 +998,7 @@ export const DataTable = forwardRef<DataTableHandle, DataTableProps>(
       data,
       columns,
       state: {
-        sorting,
+        sorting: sortingState,
         pagination: {
           pageIndex: pagination.page - 1,
           pageSize: pagination.pageSize,
@@ -960,15 +1006,15 @@ export const DataTable = forwardRef<DataTableHandle, DataTableProps>(
         rowSelection,
         columnVisibility,
       },
-      onSortingChange: setSorting,
+      onSortingChange: updateSorting,
       onRowSelectionChange: setRowSelection,
       onColumnVisibilityChange: setColumnVisibility,
       enableRowSelection: adminMode,
       manualPagination: true,
+      manualSorting: true,
       pageCount: pagination.totalPages,
       getRowId: (row) => row.id,
       getCoreRowModel: getCoreRowModel(),
-      getSortedRowModel: getSortedRowModel(),
     });
 
     const selectedLeadIds = table

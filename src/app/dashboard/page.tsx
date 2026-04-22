@@ -18,6 +18,7 @@ import {
   getAutoAssignEnabled,
   getDashboardData,
   normalizeLeadPagination,
+  normalizeLeadSorting,
   type TelecallerOption,
 } from "@/lib/lead-service";
 import { getDynamicLeadFieldLabels } from "@/lib/lead-field-settings";
@@ -72,6 +73,10 @@ export default async function DashboardPage({
     page: readInteger(query.page),
     pageSize: readInteger(query.pageSize),
   });
+  const tableSorting = normalizeLeadSorting({
+    sortBy: readSingle(query.sortBy),
+    sortDirection: readSingle(query.sortDirection),
+  });
 
   function buildDashboardHref({
     q,
@@ -123,6 +128,11 @@ export default async function DashboardPage({
       params.set("pageSize", String(pagination.pageSize));
     }
 
+    if (tableSorting) {
+      params.set("sortBy", tableSorting.sortBy);
+      params.set("sortDirection", tableSorting.sortDirection);
+    }
+
     return params.size ? `/dashboard?${params.toString()}` : "/dashboard";
   }
 
@@ -131,7 +141,7 @@ export default async function DashboardPage({
     autoAssignEnabled,
     dynamicFieldLabels,
   ] = await Promise.all([
-    getDashboardData(user, filters, pagination),
+    getDashboardData(user, filters, pagination, tableSorting),
     user.role === "ADMIN" ? getAutoAssignEnabled() : Promise.resolve(false),
     getDynamicLeadFieldLabels(),
   ]);
@@ -303,6 +313,7 @@ export default async function DashboardPage({
             <LeadQueueSection
               data={leads}
               pagination={leadPagination}
+              sorting={tableSorting}
               telecallers={telecallers.map((tc: TelecallerOption) => ({
                 id: tc.id,
                 name: tc.name,

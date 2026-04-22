@@ -10,6 +10,7 @@ import {
   deleteLeadsBulkSelected,
   getDashboardData,
   normalizeLeadPagination,
+  normalizeLeadSorting,
 } from "@/lib/lead-service";
 
 export async function GET(request: NextRequest) {
@@ -23,6 +24,10 @@ export async function GET(request: NextRequest) {
   const pagination = normalizeLeadPagination({
     page: Number.parseInt(searchParams.get("page") ?? "", 10),
     pageSize: Number.parseInt(searchParams.get("pageSize") ?? "", 10),
+  });
+  const sorting = normalizeLeadSorting({
+    sortBy: searchParams.get("sortBy"),
+    sortDirection: searchParams.get("sortDirection"),
   });
   const data = await getDashboardData(
     user,
@@ -57,6 +62,7 @@ export async function GET(request: NextRequest) {
           | null) ?? undefined,
     },
     pagination,
+    sorting,
   );
 
   return NextResponse.json(data);

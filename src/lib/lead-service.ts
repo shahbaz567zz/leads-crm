@@ -66,6 +66,37 @@ export type LeadPagination = {
   hasPreviousPage: boolean;
 };
 
+export type LeadSortInput = {
+  sortBy?: string | null;
+  sortDirection?: string | null;
+};
+
+export const LEAD_SORT_FIELDS = [
+  "leadNumber",
+  "name",
+  "email",
+  "status",
+  "priority",
+  "jeeRankRange",
+  "twelfthLocation",
+  "courseInterest",
+  "dynamicField1",
+  "dynamicField2",
+  "dynamicField3",
+  "assignedTo",
+  "createdAt",
+  "nextFollowUpAt",
+  "campaignName",
+] as const;
+
+export type LeadSortField = (typeof LEAD_SORT_FIELDS)[number];
+export type LeadSortDirection = "asc" | "desc";
+
+export type LeadSort = {
+  sortBy: LeadSortField;
+  sortDirection: LeadSortDirection;
+};
+
 export type StageMixItem = {
   status: LeadStatusValue;
   count: number;
@@ -132,6 +163,10 @@ export type LeadExportRow = {
 
 export const LEAD_PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 export const DEFAULT_LEAD_PAGE_SIZE = LEAD_PAGE_SIZE_OPTIONS[0];
+const DEFAULT_LEAD_SORTING: LeadSort = {
+  sortBy: "createdAt",
+  sortDirection: "desc",
+};
 
 const dashboardAnalyticsSelect = {
   id: true,
@@ -229,6 +264,92 @@ export function normalizeLeadPagination(
       ? requestedPageSize
       : DEFAULT_LEAD_PAGE_SIZE,
   };
+}
+
+export function normalizeLeadSorting(sorting?: LeadSortInput): LeadSort | null {
+  if (!sorting?.sortBy) {
+    return null;
+  }
+
+  if (!LEAD_SORT_FIELDS.includes(sorting.sortBy as LeadSortField)) {
+    return null;
+  }
+
+  return {
+    sortBy: sorting.sortBy as LeadSortField,
+    sortDirection: sorting.sortDirection === "desc" ? "desc" : "asc",
+  };
+}
+
+function resolveLeadSorting(sorting?: LeadSortInput): LeadSort {
+  return normalizeLeadSorting(sorting) ?? DEFAULT_LEAD_SORTING;
+}
+
+function buildLeadQueueOrderBy(
+  sortingInput?: LeadSortInput,
+): Prisma.LeadOrderByWithRelationInput[] {
+  const sorting = resolveLeadSorting(sortingInput);
+  const orderBy: Prisma.LeadOrderByWithRelationInput[] = [];
+
+  switch (sorting.sortBy) {
+    case "assignedTo":
+      orderBy.push({
+        assignedTo: {
+          name: sorting.sortDirection,
+        },
+      });
+      break;
+    case "leadNumber":
+      orderBy.push({ leadNumber: sorting.sortDirection });
+      break;
+    case "name":
+      orderBy.push({ name: sorting.sortDirection });
+      break;
+    case "email":
+      orderBy.push({ email: sorting.sortDirection });
+      break;
+    case "status":
+      orderBy.push({ status: sorting.sortDirection });
+      break;
+    case "priority":
+      orderBy.push({ priority: sorting.sortDirection });
+      break;
+    case "jeeRankRange":
+      orderBy.push({ jeeRankRange: sorting.sortDirection });
+      break;
+    case "twelfthLocation":
+      orderBy.push({ twelfthLocation: sorting.sortDirection });
+      break;
+    case "courseInterest":
+      orderBy.push({ courseInterest: sorting.sortDirection });
+      break;
+    case "dynamicField1":
+      orderBy.push({ dynamicField1: sorting.sortDirection });
+      break;
+    case "dynamicField2":
+      orderBy.push({ dynamicField2: sorting.sortDirection });
+      break;
+    case "dynamicField3":
+      orderBy.push({ dynamicField3: sorting.sortDirection });
+      break;
+    case "nextFollowUpAt":
+      orderBy.push({ nextFollowUpAt: sorting.sortDirection });
+      break;
+    case "campaignName":
+      orderBy.push({ campaignName: sorting.sortDirection });
+      break;
+    case "createdAt":
+      orderBy.push({ createdAt: sorting.sortDirection });
+      break;
+  }
+
+  if (sorting.sortBy !== "createdAt") {
+    orderBy.push({ createdAt: "desc" });
+  }
+
+  orderBy.push({ id: "desc" });
+
+  return orderBy;
 }
 
 function buildDashboardReporting(
@@ -555,10 +676,12 @@ export async function getLeadQueuePage(
   user: SessionUser,
   filters: DashboardFilters,
   paginationInput?: LeadPaginationInput,
+  sortingInput?: LeadSortInput,
 ) {
   const where = buildScopedWhere(user, filters);
   const { page: requestedPage, pageSize } =
     normalizeLeadPagination(paginationInput);
+  const orderBy = buildLeadQueueOrderBy(sortingInput);
 
   return prisma.$transaction(async (tx) => {
     const totalCount = await tx.lead.count({ where });
@@ -566,7 +689,7 @@ export async function getLeadQueuePage(
     const page = totalCount === 0 ? 1 : Math.min(requestedPage, totalPages);
     const leads = await tx.lead.findMany({
       where,
-      orderBy: [{ createdAt: "desc" }],
+      orderBy,
       include: leadQueueInclude,
       skip: totalCount === 0 ? 0 : (page - 1) * pageSize,
       take: pageSize,
@@ -914,10 +1037,11 @@ export async function getDashboardData(
   user: SessionUser,
   filters: DashboardFilters,
   paginationInput?: LeadPaginationInput,
+  sortingInput?: LeadSortInput,
 ) {
   const scopeWhere = buildScopedWhere(user);
   const [pageData, telecallers, statsData] = await Promise.all([
-    getLeadQueuePage(user, filters, paginationInput),
+    getLeadQueuePage(user, filters, paginationInput, sortingInput),
     getTelecallers(),
     prisma.$transaction([
       prisma.lead.count({ where: scopeWhere }),
