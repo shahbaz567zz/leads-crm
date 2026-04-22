@@ -266,7 +266,9 @@ export function normalizeLeadPagination(
   };
 }
 
-export function normalizeLeadSorting(sorting?: LeadSortInput): LeadSort | null {
+export function normalizeLeadSorting(
+  sorting?: LeadSortInput | null,
+): LeadSort | null {
   if (!sorting?.sortBy) {
     return null;
   }
@@ -281,12 +283,12 @@ export function normalizeLeadSorting(sorting?: LeadSortInput): LeadSort | null {
   };
 }
 
-function resolveLeadSorting(sorting?: LeadSortInput): LeadSort {
+function resolveLeadSorting(sorting?: LeadSortInput | null): LeadSort {
   return normalizeLeadSorting(sorting) ?? DEFAULT_LEAD_SORTING;
 }
 
 function buildLeadQueueOrderBy(
-  sortingInput?: LeadSortInput,
+  sortingInput?: LeadSortInput | null,
 ): Prisma.LeadOrderByWithRelationInput[] {
   const sorting = resolveLeadSorting(sortingInput);
   const orderBy: Prisma.LeadOrderByWithRelationInput[] = [];
@@ -676,7 +678,7 @@ export async function getLeadQueuePage(
   user: SessionUser,
   filters: DashboardFilters,
   paginationInput?: LeadPaginationInput,
-  sortingInput?: LeadSortInput,
+  sortingInput?: LeadSortInput | null,
 ) {
   const where = buildScopedWhere(user, filters);
   const { page: requestedPage, pageSize } =
@@ -1037,7 +1039,7 @@ export async function getDashboardData(
   user: SessionUser,
   filters: DashboardFilters,
   paginationInput?: LeadPaginationInput,
-  sortingInput?: LeadSortInput,
+  sortingInput?: LeadSortInput | null,
 ) {
   const scopeWhere = buildScopedWhere(user);
   const [pageData, telecallers, statsData] = await Promise.all([
