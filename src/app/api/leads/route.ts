@@ -9,6 +9,7 @@ import {
   deleteLeadsBulkFiltered,
   deleteLeadsBulkSelected,
   getDashboardData,
+  normalizeLeadPagination,
 } from "@/lib/lead-service";
 
 export async function GET(request: NextRequest) {
@@ -19,35 +20,44 @@ export async function GET(request: NextRequest) {
   }
 
   const searchParams = request.nextUrl.searchParams;
-  const data = await getDashboardData(user, {
-    q: searchParams.get("q") ?? undefined,
-    status:
-      (searchParams.get("status") as
-        | "NEW"
-        | "ASSIGNED"
-        | "CONTACTED"
-        | "INTERESTED"
-        | "MEETING_SCHEDULED"
-        | "VISITED"
-        | "CONVERTED"
-        | "NOT_INTERESTED"
-        | "LOST"
-        | null) ?? undefined,
-    priority:
-      (searchParams.get("priority") as "HIGH" | "MEDIUM" | "LOW" | null) ??
-      undefined,
-    assigned: searchParams.get("assigned") ?? undefined,
-    due:
-      (searchParams.get("due") as "all" | "today" | "overdue" | null) ?? "all",
-    sla:
-      (searchParams.get("sla") as
-        | "overdue_open"
-        | "due_today_open"
-        | "high_priority_uncontacted"
-        | "stale_30m"
-        | "stale_2h"
-        | null) ?? undefined,
+  const pagination = normalizeLeadPagination({
+    page: Number.parseInt(searchParams.get("page") ?? "", 10),
+    pageSize: Number.parseInt(searchParams.get("pageSize") ?? "", 10),
   });
+  const data = await getDashboardData(
+    user,
+    {
+      q: searchParams.get("q") ?? undefined,
+      status:
+        (searchParams.get("status") as
+          | "NEW"
+          | "ASSIGNED"
+          | "CONTACTED"
+          | "INTERESTED"
+          | "MEETING_SCHEDULED"
+          | "VISITED"
+          | "CONVERTED"
+          | "NOT_INTERESTED"
+          | "LOST"
+          | null) ?? undefined,
+      priority:
+        (searchParams.get("priority") as "HIGH" | "MEDIUM" | "LOW" | null) ??
+        undefined,
+      assigned: searchParams.get("assigned") ?? undefined,
+      due:
+        (searchParams.get("due") as "all" | "today" | "overdue" | null) ??
+        "all",
+      sla:
+        (searchParams.get("sla") as
+          | "overdue_open"
+          | "due_today_open"
+          | "high_priority_uncontacted"
+          | "stale_30m"
+          | "stale_2h"
+          | null) ?? undefined,
+    },
+    pagination,
+  );
 
   return NextResponse.json(data);
 }

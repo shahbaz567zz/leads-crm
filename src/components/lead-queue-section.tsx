@@ -12,6 +12,7 @@ import { LeadQueueFilters } from "@/components/lead-queue-filters";
 import { Button } from "@/components/ui/button";
 
 export function LeadQueueSection({
+  pagination,
   telecallers,
   managerMode,
   ...tableProps
@@ -39,6 +40,7 @@ export function LeadQueueSection({
 
       <DataTable
         ref={dataTableRef}
+        pagination={pagination}
         telecallers={telecallers}
         managerMode={managerMode}
         {...tableProps}

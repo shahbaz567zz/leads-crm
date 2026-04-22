@@ -53,7 +53,8 @@ export function LeadQueueFilters({
         current.delete("sla");
       }
 
-      // reset to page 1 implicitly by removing page param, if you have one
+      current.delete("page");
+
       startTransition(() => {
         const next = current.size
           ? `${pathname}?${current.toString()}`

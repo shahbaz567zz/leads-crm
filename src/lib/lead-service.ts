@@ -52,6 +52,20 @@ export type DashboardFilters = {
     | "stale_2h";
 };
 
+export type LeadPaginationInput = {
+  page?: number;
+  pageSize?: number;
+};
+
+export type LeadPagination = {
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+};
+
 export type StageMixItem = {
   status: LeadStatusValue;
   count: number;
@@ -116,6 +130,9 @@ export type LeadExportRow = {
   updatedAt: Date;
 };
 
+export const LEAD_PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
+export const DEFAULT_LEAD_PAGE_SIZE = LEAD_PAGE_SIZE_OPTIONS[0];
+
 const dashboardAnalyticsSelect = {
   id: true,
   name: true,
@@ -130,6 +147,20 @@ const dashboardAnalyticsSelect = {
     select: {
       id: true,
       name: true,
+    },
+  },
+} as const;
+
+const leadQueueInclude = {
+  assignedTo: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+  _count: {
+    select: {
+      activities: true,
     },
   },
 } as const;
@@ -176,6 +207,28 @@ type LeadExportRecord = Prisma.LeadGetPayload<{
 
 function isOpenLead(status: LeadStatusValue) {
   return !CLOSED_LEAD_STATUSES.includes(status);
+}
+
+export function normalizeLeadPagination(
+  pagination?: LeadPaginationInput,
+): Pick<LeadPagination, "page" | "pageSize"> {
+  const page =
+    Number.isInteger(pagination?.page) && (pagination?.page ?? 0) > 0
+      ? (pagination?.page as number)
+      : 1;
+  const requestedPageSize =
+    Number.isInteger(pagination?.pageSize) && (pagination?.pageSize ?? 0) > 0
+      ? (pagination?.pageSize as number)
+      : DEFAULT_LEAD_PAGE_SIZE;
+
+  return {
+    page,
+    pageSize: LEAD_PAGE_SIZE_OPTIONS.includes(
+      requestedPageSize as (typeof LEAD_PAGE_SIZE_OPTIONS)[number],
+    )
+      ? requestedPageSize
+      : DEFAULT_LEAD_PAGE_SIZE,
+  };
 }
 
 function buildDashboardReporting(
@@ -495,6 +548,41 @@ export async function setAutoAssignEnabled(enabled: boolean) {
     where: { id: AUTO_ASSIGN_SETTING_ID },
     update: { autoAssignEnabled: enabled },
     create: { id: AUTO_ASSIGN_SETTING_ID, autoAssignEnabled: enabled },
+  });
+}
+
+export async function getLeadQueuePage(
+  user: SessionUser,
+  filters: DashboardFilters,
+  paginationInput?: LeadPaginationInput,
+) {
+  const where = buildScopedWhere(user, filters);
+  const { page: requestedPage, pageSize } =
+    normalizeLeadPagination(paginationInput);
+
+  return prisma.$transaction(async (tx) => {
+    const totalCount = await tx.lead.count({ where });
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    const page = totalCount === 0 ? 1 : Math.min(requestedPage, totalPages);
+    const leads = await tx.lead.findMany({
+      where,
+      orderBy: [{ createdAt: "desc" }],
+      include: leadQueueInclude,
+      skip: totalCount === 0 ? 0 : (page - 1) * pageSize,
+      take: pageSize,
+    });
+
+    return {
+      leads,
+      pagination: {
+        page,
+        pageSize,
+        totalCount,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      } satisfies LeadPagination,
+    };
   });
 }
 
@@ -825,12 +913,53 @@ async function assignLeadAutomatically(
 export async function getDashboardData(
   user: SessionUser,
   filters: DashboardFilters,
+  paginationInput?: LeadPaginationInput,
 ) {
   const scopeWhere = buildScopedWhere(user);
-  const visibleWhere = buildScopedWhere(user, filters);
-
+  const [pageData, telecallers, statsData] = await Promise.all([
+    getLeadQueuePage(user, filters, paginationInput),
+    getTelecallers(),
+    prisma.$transaction([
+      prisma.lead.count({ where: scopeWhere }),
+      prisma.lead.count({ where: { ...scopeWhere, status: "NEW" } }),
+      prisma.lead.count({
+        where: {
+          ...scopeWhere,
+          nextFollowUpAt: {
+            gte: startOfDay(new Date()),
+            lte: endOfDay(new Date()),
+          },
+        },
+      }),
+      prisma.lead.count({
+        where: {
+          ...scopeWhere,
+          nextFollowUpAt: {
+            lt: new Date(),
+          },
+          status: {
+            notIn: ["CONVERTED", "NOT_INTERESTED", "LOST"],
+          },
+        },
+      }),
+      prisma.lead.count({ where: { ...scopeWhere, status: "CONVERTED" } }),
+      prisma.meeting.count({
+        where: {
+          status: "SCHEDULED",
+          scheduledAt: {
+            gte: startOfDay(new Date()),
+            lte: endOfDay(addDays(new Date(), 7)),
+          },
+          lead: scopeWhere,
+        },
+      }),
+      prisma.lead.findMany({
+        where: scopeWhere,
+        select: dashboardAnalyticsSelect,
+      }),
+    ]),
+  ]);
   const [
-    leads,
     totalLeads,
     newLeads,
     dueToday,
@@ -838,64 +967,7 @@ export async function getDashboardData(
     converted,
     meetingsSoon,
     analyticsRows,
-  ] = await prisma.$transaction([
-    prisma.lead.findMany({
-      where: visibleWhere,
-      orderBy: [{ createdAt: "desc" }],
-      include: {
-        assignedTo: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        _count: {
-          select: {
-            activities: true,
-          },
-        },
-      },
-      take: 150,
-    }),
-    prisma.lead.count({ where: scopeWhere }),
-    prisma.lead.count({ where: { ...scopeWhere, status: "NEW" } }),
-    prisma.lead.count({
-      where: {
-        ...scopeWhere,
-        nextFollowUpAt: {
-          gte: startOfDay(new Date()),
-          lte: endOfDay(new Date()),
-        },
-      },
-    }),
-    prisma.lead.count({
-      where: {
-        ...scopeWhere,
-        nextFollowUpAt: {
-          lt: new Date(),
-        },
-        status: {
-          notIn: ["CONVERTED", "NOT_INTERESTED", "LOST"],
-        },
-      },
-    }),
-    prisma.lead.count({ where: { ...scopeWhere, status: "CONVERTED" } }),
-    prisma.meeting.count({
-      where: {
-        status: "SCHEDULED",
-        scheduledAt: {
-          gte: startOfDay(new Date()),
-          lte: endOfDay(addDays(new Date(), 7)),
-        },
-        lead: scopeWhere,
-      },
-    }),
-    prisma.lead.findMany({
-      where: scopeWhere,
-      select: dashboardAnalyticsSelect,
-    }),
-  ]);
-  const telecallers = await getTelecallers();
+  ] = statsData;
   const reporting = buildDashboardReporting(
     analyticsRows,
     telecallers,
@@ -904,7 +976,8 @@ export async function getDashboardData(
   );
 
   return {
-    leads,
+    leads: pageData.leads,
+    pagination: pageData.pagination,
     telecallers,
     reporting,
     stats: {

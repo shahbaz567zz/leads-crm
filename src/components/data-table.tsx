@@ -10,13 +10,11 @@ import {
 } from "react";
 import {
   type ColumnDef,
-  type PaginationState,
   type RowSelectionState,
   type SortingState,
   type VisibilityState,
   flexRender,
   getCoreRowModel,
-  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
@@ -24,7 +22,7 @@ import { format } from "date-fns";
 import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
 import { X } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 
 import { Button } from "@/components/ui/button";
@@ -73,6 +71,14 @@ type LeadRow = {
 
 export interface DataTableProps {
   data: LeadRow[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalCount: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
   telecallers: { id: string; name: string }[];
   managerMode: boolean;
   adminMode: boolean;
@@ -124,6 +130,8 @@ const COLUMN_PREFERENCE_OPTIONS: ColumnPreferenceOption[] = [
   { id: "campaignName", label: "Campaign", defaultVisible: true },
   { id: "actions", label: "Actions", defaultVisible: false },
 ];
+
+const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 
 function getColumnPreferenceOptions(
   dynamicFieldLabels: DynamicLeadFieldLabels,
@@ -236,6 +244,7 @@ export const DataTable = forwardRef<DataTableHandle, DataTableProps>(
   function DataTable(
     {
       data: initialData,
+      pagination,
       telecallers,
       managerMode,
       adminMode,
@@ -246,6 +255,8 @@ export const DataTable = forwardRef<DataTableHandle, DataTableProps>(
     ref,
   ) {
     const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
     const resolvedDynamicFieldLabels = useMemo(
       () => normalizeDynamicLeadFieldLabels(dynamicFieldLabels),
       [dynamicFieldLabels],
@@ -263,10 +274,6 @@ export const DataTable = forwardRef<DataTableHandle, DataTableProps>(
           initialColumnVisibilityPreference,
         ),
     );
-    const [pagination, setPagination] = useState<PaginationState>({
-      pageIndex: 0,
-      pageSize: 20,
-    });
     const [bulkPendingAction, setBulkPendingAction] = useState<string | null>(
       null,
     );
@@ -283,7 +290,6 @@ export const DataTable = forwardRef<DataTableHandle, DataTableProps>(
 
     useEffect(() => {
       setData(initialData);
-      setPagination((prev) => ({ ...prev, pageIndex: 0 }));
       setRowSelection({});
     }, [initialData]);
 
@@ -474,6 +480,39 @@ export const DataTable = forwardRef<DataTableHandle, DataTableProps>(
         };
       },
       [currentFilters],
+    );
+
+    const updatePagination = useCallback(
+      (nextPage: number, nextPageSize = pagination.pageSize) => {
+        const params = new URLSearchParams(Array.from(searchParams.entries()));
+        const page = Math.min(
+          Math.max(1, nextPage),
+          Math.max(1, pagination.totalPages),
+        );
+
+        if (page <= 1) {
+          params.delete("page");
+        } else {
+          params.set("page", String(page));
+        }
+
+        if (nextPageSize === PAGE_SIZE_OPTIONS[0]) {
+          params.delete("pageSize");
+        } else {
+          params.set("pageSize", String(nextPageSize));
+        }
+
+        router.push(
+          params.size ? `${pathname}?${params.toString()}` : pathname,
+        );
+      },
+      [
+        pagination.pageSize,
+        pagination.totalPages,
+        pathname,
+        router,
+        searchParams,
+      ],
     );
 
     const columns = useMemo<ColumnDef<LeadRow>[]>(
@@ -914,40 +953,35 @@ export const DataTable = forwardRef<DataTableHandle, DataTableProps>(
       columns,
       state: {
         sorting,
-        pagination,
+        pagination: {
+          pageIndex: pagination.page - 1,
+          pageSize: pagination.pageSize,
+        },
         rowSelection,
         columnVisibility,
       },
       onSortingChange: setSorting,
-      onPaginationChange: setPagination,
       onRowSelectionChange: setRowSelection,
       onColumnVisibilityChange: setColumnVisibility,
       enableRowSelection: adminMode,
+      manualPagination: true,
+      pageCount: pagination.totalPages,
       getRowId: (row) => row.id,
       getCoreRowModel: getCoreRowModel(),
       getSortedRowModel: getSortedRowModel(),
-      getPaginationRowModel: getPaginationRowModel(),
-      initialState: {
-        pagination: {
-          pageIndex: 0,
-          pageSize: 20,
-        },
-      },
     });
 
     const selectedLeadIds = table
       .getSelectedRowModel()
       .rows.map((row) => row.original.id);
     const selectedCount = selectedLeadIds.length;
-    const pageIndex = table.getState().pagination.pageIndex;
-    const pageSize = table.getState().pagination.pageSize;
+    const pageIndex = pagination.page - 1;
+    const pageSize = pagination.pageSize;
     const pageRowsCount = table.getRowModel().rows.length;
-    const totalRows = data.length;
+    const totalRows = pagination.totalCount;
     const pageStart = totalRows === 0 ? 0 : pageIndex * pageSize + 1;
     const pageEnd =
-      totalRows === 0
-        ? 0
-        : Math.min(pageIndex * pageSize + pageRowsCount, totalRows);
+      totalRows === 0 ? 0 : Math.min(pageStart + pageRowsCount - 1, totalRows);
     const activeFilterCount = [
       currentFilters.q,
       currentFilters.status,
@@ -1221,7 +1255,7 @@ export const DataTable = forwardRef<DataTableHandle, DataTableProps>(
 
         <div className="flex flex-col gap-2 rounded-lg border border-slate-100 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:border-slate-700 dark:bg-slate-800">
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Showing {pageStart}-{pageEnd} of {totalRows} loaded lead
+            Showing {pageStart}-{pageEnd} of {totalRows} lead
             {totalRows === 1 ? "" : "s"}
           </p>
 
@@ -1230,12 +1264,12 @@ export const DataTable = forwardRef<DataTableHandle, DataTableProps>(
               Rows
               <select
                 className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
-                value={table.getState().pagination.pageSize}
+                value={pagination.pageSize}
                 onChange={(event) => {
-                  table.setPageSize(Number(event.target.value));
+                  updatePagination(1, Number(event.target.value));
                 }}
               >
-                {[20, 50, 100].map((size) => (
+                {PAGE_SIZE_OPTIONS.map((size) => (
                   <option key={size} value={size}>
                     {size}
                   </option>
@@ -1247,20 +1281,19 @@ export const DataTable = forwardRef<DataTableHandle, DataTableProps>(
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
+                onClick={() => updatePagination(pagination.page - 1)}
+                disabled={!pagination.hasPreviousPage}
               >
                 Prev
               </Button>
               <span>
-                Page {table.getState().pagination.pageIndex + 1} of{" "}
-                {Math.max(1, table.getPageCount())}
+                Page {pagination.page} of {Math.max(1, pagination.totalPages)}
               </span>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
+                onClick={() => updatePagination(pagination.page + 1)}
+                disabled={!pagination.hasNextPage}
               >
                 Next
               </Button>

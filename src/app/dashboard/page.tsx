@@ -14,14 +14,28 @@ import {
   type LeadStatusValue,
 } from "@/lib/crm-constants";
 import {
+  DEFAULT_LEAD_PAGE_SIZE,
   getAutoAssignEnabled,
   getDashboardData,
+  normalizeLeadPagination,
   type TelecallerOption,
 } from "@/lib/lead-service";
 import { getDynamicLeadFieldLabels } from "@/lib/lead-field-settings";
 
 function readSingle(value?: string | string[]) {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function readInteger(value?: string | string[]) {
+  const rawValue = readSingle(value);
+
+  if (!rawValue) {
+    return undefined;
+  }
+
+  const parsedValue = Number.parseInt(rawValue, 10);
+
+  return Number.isInteger(parsedValue) ? parsedValue : undefined;
 }
 
 export default async function DashboardPage({
@@ -54,6 +68,10 @@ export default async function DashboardPage({
       | "stale_2h"
       | undefined,
   };
+  const pagination = normalizeLeadPagination({
+    page: readInteger(query.page),
+    pageSize: readInteger(query.pageSize),
+  });
 
   function buildDashboardHref({
     q,
@@ -101,15 +119,19 @@ export default async function DashboardPage({
       params.set("sla", sla);
     }
 
+    if (pagination.pageSize !== DEFAULT_LEAD_PAGE_SIZE) {
+      params.set("pageSize", String(pagination.pageSize));
+    }
+
     return params.size ? `/dashboard?${params.toString()}` : "/dashboard";
   }
 
   const [
-    { leads, stats, telecallers, reporting },
+    { leads, pagination: leadPagination, stats, telecallers, reporting },
     autoAssignEnabled,
     dynamicFieldLabels,
   ] = await Promise.all([
-    getDashboardData(user, filters),
+    getDashboardData(user, filters, pagination),
     user.role === "ADMIN" ? getAutoAssignEnabled() : Promise.resolve(false),
     getDynamicLeadFieldLabels(),
   ]);
@@ -271,14 +293,16 @@ export default async function DashboardPage({
                   Lead Queue
                 </h2>
                 <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-                  {leads.length} lead{leads.length === 1 ? "" : "s"} matched
-                  your criteria
+                  {leadPagination.totalCount} lead
+                  {leadPagination.totalCount === 1 ? "" : "s"} matched your
+                  criteria
                 </p>
               </div>
             </div>
 
             <LeadQueueSection
               data={leads}
+              pagination={leadPagination}
               telecallers={telecallers.map((tc: TelecallerOption) => ({
                 id: tc.id,
                 name: tc.name,
